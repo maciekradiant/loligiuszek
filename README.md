@@ -1,2 +1,2 @@
-- 👋 Hi, I’m Maciej im new developer!
-- 🌱 I’m currently learning java, python and front-end
+- 👋 Hi, I’m Maciej im beginner dev!
+- 🌱 I’m currently learning java, python and sometimes front-end
