@@ -1,2 +1,3 @@
-- 👋 Hi, I’m Maciej im beginner dev!
-- 🌱 I’m currently learning java and python
+- 👋 Hi, There is nothing here but, thank you for coming to my site
+- 🌱 I’m currently learning
+- 🎶 Working on music ai
