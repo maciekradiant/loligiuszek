@@ -1,0 +1,18 @@
+{
+  "name": "Lotka – licznik do darta",
+  "short_name": "Lotka",
+  "description": "Licznik punktów do darta: X01, Cricket, Dookoła zegara, Shanghai, Killer, turnieje i statystyki.",
+  "lang": "pl",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0e0d0b",
+  "theme_color": "#0e0d0b",
+  "categories": ["games", "sports", "utilities"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
