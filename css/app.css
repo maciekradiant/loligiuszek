@@ -618,6 +618,7 @@ textarea:focus {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   padding: 6px var(--gut-r) calc(6px + var(--sab)) var(--gut-l);
+  background: var(--panel);
   background: color-mix(in srgb, var(--panel) 92%, transparent);
   border-top: 1px solid var(--line);
   -webkit-backdrop-filter: blur(18px);
@@ -792,6 +793,7 @@ textarea:focus {
   align-items: center;
   gap: 12px;
   background: linear-gradient(160deg, var(--brass-soft), transparent 70%), var(--panel);
+  border: 1px solid var(--brass);
   border: 1px solid color-mix(in srgb, var(--brass) 45%, var(--line));
   border-radius: var(--r-lg);
   padding: 12px 14px;
@@ -1325,6 +1327,7 @@ textarea:focus {
 
 .pc.on {
   background: radial-gradient(120% 90% at 50% 0%, var(--red-soft), transparent 70%), var(--panel);
+  border-color: var(--red);
   border-color: color-mix(in srgb, var(--red) 70%, var(--line));
 }
 
@@ -1392,6 +1395,7 @@ textarea:focus {
   align-items: center;
   font-family: var(--font-display);
   font-weight: 800;
+  font-size: clamp(64px, 15vh, 124px);
   font-size: clamp(64px, 15dvh, 124px);
   line-height: 0.86;
   letter-spacing: -0.01em;
@@ -1479,6 +1483,7 @@ textarea:focus {
 }
 
 .pc.solo .pc-score {
+  font-size: clamp(96px, 22vh, 170px);
   font-size: clamp(96px, 22dvh, 170px);
 }
 
@@ -1508,6 +1513,7 @@ textarea:focus {
 
 .prow.on {
   background: radial-gradient(120% 120% at 0% 0%, var(--red-soft), transparent 70%), var(--panel);
+  border-color: var(--red);
   border-color: color-mix(in srgb, var(--red) 70%, var(--line));
   padding: 14px 12px;
 }
@@ -1930,6 +1936,7 @@ textarea:focus {
 }
 
 .key.xl {
+  min-height: clamp(52px, 8.5vh, 72px);
   min-height: clamp(52px, 8.5dvh, 72px);
   font-size: 32px;
 }
@@ -2739,6 +2746,7 @@ textarea:focus {
     gap: 5px;
   }
   .pc-score {
+    font-size: clamp(54px, 13vh, 100px);
     font-size: clamp(54px, 13dvh, 100px);
   }
   .turn {
@@ -3029,6 +3037,7 @@ textarea:focus {
     grid-row: 3 / span 2;
   }
   .pc-score {
+    font-size: clamp(48px, 18vh, 96px);
     font-size: clamp(48px, 18dvh, 96px);
   }
   .key,

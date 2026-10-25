@@ -73,7 +73,7 @@ export function snookerRemaining(st) {
 export function snookerOn(st, t) {
   if (st.phase === 'colors') return [st.next];
   if (!st.colorOn) return st.reds > 0 ? [1] : [];
-  const extraRed = st.reds > 0 && t.balls.at(-1) === 1 ? [1] : [];
+  const extraRed = st.reds > 0 && t.balls[t.balls.length - 1] === 1 ? [1] : [];
   return [...extraRed, ...SNOOKER_COLORS];
 }
 

@@ -259,7 +259,7 @@ function turnStrip(m, R) {
 function turnSum(m, R) {
   const t = R.leg.turn;
   if (t.n === 0) {
-    const prev = R.leg.visits.at(-1);
+    const prev = R.leg.visits[R.leg.visits.length - 1];
     if (!prev) return `<small>Zaczyna</small>${esc(firstName(m.players[t.p].name))}`;
     const label = m.mode === 'x01' ? (prev.bust ? 'BUST' : prev.score) : m.mode === 'killer' ? '–' : prev.score;
     return `<small>${esc(firstName(m.players[prev.p].name))} · ostatnio</small>${label}`;
