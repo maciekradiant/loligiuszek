@@ -136,13 +136,59 @@ const snooker = {
   },
 };
 
-export const CUE_ENGINES = { pool8, pool9, snooker };
+// Bieda wersja: one table, more than two people. Players are drawn into groups; two groups play
+// a frame of 8- or 9-ball with members taking turns, and with three or more groups the winners
+// stay at the table while the losers join the back of the queue.
+
+export const GROUP_NAMES = [
+  'Kredowe Łapy',
+  'Ekipa z Łuzy',
+  'Banda Spod Lampy',
+  'Mistrzowie Pudła',
+  'Królowie Bandy',
+  'Ostatnia Bila',
+  'Krzywy Kij',
+  'Sępy Bilardowe',
+  'Rozbici',
+  'Gang Białej Bili',
+];
+
+export const groupName = (rules, g) => rules.groupNames?.[g] || `Grupa ${String.fromCharCode(65 + g)}`;
+
+// Splits players into groups of `size` (the last one may be smaller).
+export function drawGroups(ids, size, rand = Math.random) {
+  const pool = [...ids];
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  const groups = [];
+  for (let i = 0; i < pool.length; i += size) groups.push(pool.slice(i, i + size));
+  const names = [...GROUP_NAMES];
+  for (let i = names.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [names[i], names[j]] = [names[j], names[i]];
+  }
+  return { groups, names: groups.map((_, g) => names[g % names.length]) };
+}
+
+const bieda = {
+  id: 'bieda',
+  name: 'Bieda wersja',
+  cue: true,
+  minPlayers: 3,
+  defaults: { game: 'pool8', groupSize: 2, legs: 5, sets: 1, threeFoul: true },
+  describe: (r) => `Bieda wersja · ${r.game === 'pool9' ? 'dziewiątka' : 'ósemka'}`,
+};
+
+export const CUE_ENGINES = { pool8, pool9, snooker, bieda };
 
 // ---------- driver ----------
 
 const newVisit = (p) => ({ p, balls: [], pts: 0, n: 0, foul: null, score: 0 });
 
 export function replayCue(match) {
+  if (match.mode === 'bieda') return replayBieda(match);
   const eng = CUE_ENGINES[match.mode];
   const R = {
     match,
@@ -265,4 +311,163 @@ function winFrame(R, w) {
   R.legNo++;
   const breaker = R.rules.breakRule === 'winner' ? w : (R.match.start + R.legNo) % 2;
   startFrame(R, breaker);
+}
+
+// ---------- bieda wersja driver ----------
+
+function replayBieda(match) {
+  const rules = match.rules;
+  const n = match.players.length;
+  const groups = rules.groups?.length >= 2 ? rules.groups : [range(0, Math.ceil(n / 2) - 1), range(Math.ceil(n / 2), n - 1)];
+  const G = groups.length;
+  const R = {
+    match,
+    eng: bieda,
+    base: rules.game === 'pool9' ? pool9 : pool8,
+    n,
+    rules,
+    meta: match.meta,
+    groups,
+    groupWins: fill(G, 0),
+    queue: G > 2 ? range(2, G - 1) : [],
+    ptr: fill(G, 0),
+    stats: Array.from({ length: n }, newCueStats),
+    sets: fill(n, 0),
+    legsInSet: fill(n, 0),
+    legNo: 0,
+    setNo: 1,
+    legs: [],
+    leg: null,
+    winner: null,
+    last: null,
+  };
+  startBiedaFrame(R, [0, 1], 0);
+  for (const ev of match.events) {
+    if (R.winner !== null) break;
+    R.last = null;
+    stepBieda(R, ev);
+  }
+  return R;
+}
+
+function startBiedaFrame(R, sides, breakSide) {
+  R.leg = {
+    no: R.legNo,
+    set: 1,
+    sides,
+    breakSide,
+    starter: null,
+    cur: null,
+    round: 1,
+    darts: fill(R.n, 0),
+    visits: [],
+    fouls: fill(2, 0),
+    winner: null,
+    st: R.base.init(R),
+    turn: null,
+  };
+  biedaVisit(R, breakSide);
+  R.leg.starter = R.leg.turn.p;
+}
+
+// Members of a group take turns: each group keeps its own pointer across frames.
+function biedaVisit(R, side) {
+  const g = R.leg.sides[side];
+  const members = R.groups[g];
+  const p = members[R.ptr[g] % members.length];
+  R.leg.turn = { side, p, balls: [], pts: 0, n: 0, foul: null, score: 0 };
+  R.leg.cur = p;
+}
+
+function endBiedaVisit(R) {
+  closeVisit(R);
+  const side = R.leg.turn.side;
+  R.ptr[R.leg.sides[side]]++;
+  biedaVisit(R, 1 - side);
+}
+
+function stepBieda(R, ev) {
+  const { leg, base } = R;
+  const t = leg.turn;
+  const side = t.side;
+  const p = t.p;
+  if (ev.k === 'pot') {
+    const res = base.pot(leg.st, side, ev.b, t, R) || {};
+    if (res.invalid) return;
+    t.balls.push(ev.b);
+    t.n++;
+    leg.fouls[side] = 0;
+    R.stats[p].pots++;
+    R.last = { type: 'pot', p, side, b: ev.b, turn: t, res };
+    if (res.winner != null) {
+      closeVisit(R);
+      winBiedaFrame(R, res.winner);
+    }
+  } else if (ev.k === 'miss') {
+    leg.fouls[side] = 0;
+    R.last = { type: 'visit', p, side, turn: t };
+    endBiedaVisit(R);
+  } else if (ev.k === 'foul') {
+    t.foul = { v: 0, red: false };
+    R.stats[p].fouls++;
+    leg.fouls[side]++;
+    const res = base.foul?.(leg.st, side, ev, t, R) || {};
+    R.last = { type: 'foul', p, side, turn: t, res };
+    if (res.winner != null) {
+      closeVisit(R);
+      winBiedaFrame(R, res.winner);
+    } else endBiedaVisit(R);
+  } else if (ev.k === 'frame' && (ev.p === 0 || ev.p === 1)) {
+    R.last = { type: 'frame', p, side, turn: t };
+    closeVisit(R);
+    winBiedaFrame(R, ev.p);
+  }
+}
+
+function winBiedaFrame(R, side) {
+  const { leg } = R;
+  const lastTurn = R.last?.turn;
+  const res = R.last?.res;
+  const g = leg.sides[side];
+  const loser = leg.sides[1 - side];
+  // The visit that ended the frame counts: that group's next visit goes to its next member.
+  R.ptr[leg.sides[leg.turn.side]]++;
+  leg.winner = side;
+  leg.winnerGroup = g;
+  R.groupWins[g]++;
+  for (const i of R.groups[g]) {
+    R.stats[i].legs++;
+    R.legsInSet[i]++;
+  }
+  const runOut = side === leg.breakSide && leg.visits.length === 1 && !leg.visits[0].foul;
+  if (runOut) R.stats[leg.visits[0].p].breakRuns++;
+  R.legs.push(leg);
+  const info = { p: R.groups[g][0], side, group: g, loser, leg, turn: lastTurn, runOut, threeFoul: !!res?.threeFoul, next: null };
+  if (R.groupWins[g] >= R.rules.legs) {
+    R.winner = g;
+    for (const i of R.groups[g]) {
+      R.stats[i].sets++;
+      R.sets[i]++;
+    }
+    R.last = { type: 'match', ...info };
+    return;
+  }
+  R.legNo++;
+  let sides = leg.sides;
+  let breakSide = 1 - leg.breakSide;
+  if (R.queue.length) {
+    // Winner stays on; the next group in the queue comes to the table and breaks.
+    R.queue.push(loser);
+    info.next = R.queue.shift();
+    sides = [g, info.next];
+    breakSide = 1;
+  }
+  R.last = { type: 'leg', ...info };
+  startBiedaFrame(R, sides, breakSide);
+}
+
+// Player indices of the match winner (a whole group in bieda wersja).
+export function winnerIndices(match, R) {
+  if (R.winner === null) return [];
+  return match.mode === 'bieda' ? R.groups[R.winner] : [R.winner];
 }

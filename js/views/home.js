@@ -6,6 +6,7 @@ import { MODE_INFO, CATEGORY_INFO, describe } from '../modes-ui.js';
 import { esc, nf } from '../util.js';
 import { icon, tabbar, categorySwitch } from './common.js';
 import { ball } from './cue.js';
+import { groupName } from '../engine/cue.js';
 import { newSetup } from './setup.js';
 
 function liveScores(ses) {
@@ -13,6 +14,12 @@ function liveScores(ses) {
   if (!m) return '';
   const R = matchState(m);
   const st = R.leg.st;
+  if (m.mode === 'bieda') {
+    return `<span class="resume-scores">${R.groups
+      .slice(0, 4)
+      .map((_, g) => `<span>${esc(groupName(R.rules, g))} <b>${R.groupWins[g]}</b></span>`)
+      .join('')}</span>`;
+  }
   const value = (i) => {
     if (m.mode === 'x01') return st.rem[i];
     if (m.mode === 'cricket' || m.mode === 'shanghai' || m.mode === 'snooker') return st.pts[i];
@@ -59,6 +66,7 @@ export function homeView() {
   const cat = S.settings.category;
   const info = CATEGORY_INFO[cat];
   const rows = CATEGORIES[cat]
+    .filter((id) => !MODE_INFO[id].joke)
     .map(
       (id) => `<button class="mode-row" data-act="new-game" data-mode="${id}" data-key="${id}">
         <span class="mode-row-glyph" aria-hidden="true">${modeGlyph(id)}</span>
@@ -79,6 +87,15 @@ export function homeView() {
         ${resumeCard()}
         <button class="btn btn-primary btn-block" data-act="new-game">Nowa gra</button>
         <div class="list-card mode-list">${rows}</div>
+        ${
+          cat === 'bilard'
+            ? `<button class="bieda-btn" data-act="new-game" data-mode="bieda">
+                <span class="bieda-ball" aria-hidden="true"></span>
+                <span class="grow"><b>Bieda wersja</b><small>${MODE_INFO.bieda.short}</small></span>
+                <span class="bieda-stamp" aria-hidden="true">3+</span>
+              </button>`
+            : ''
+        }
       </div>
       <footer class="credit"><i class="credit-rule" aria-hidden="true"></i><span><b>radiant</b> to zrobił</span></footer>
     </div>

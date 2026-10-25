@@ -933,6 +933,187 @@ textarea:focus {
   --size: 40px;
 }
 
+.bieda-btn {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 14px 16px;
+  text-align: left;
+  border-radius: var(--r-lg);
+  border: 2px dashed var(--sisal-3);
+  background: repeating-linear-gradient(-45deg, var(--panel) 0 14px, var(--panel-2) 14px 28px);
+  transform: rotate(-0.8deg);
+  transition: transform 0.2s cubic-bezier(0.34, 1.5, 0.5, 1);
+}
+
+.bieda-btn:active {
+  transform: rotate(0.6deg) scale(0.98);
+}
+
+.bieda-btn b {
+  display: block;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 24px;
+  line-height: 1.05;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.bieda-btn small {
+  display: block;
+  font-size: 13px;
+  color: var(--sisal-2);
+}
+
+/* a cue ball that has seen better days: plaster included */
+.bieda-ball {
+  position: relative;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  margin: 0 7px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 32% 28%, #ffffffaa 0 6%, transparent 30%), radial-gradient(circle at 50% 50%, transparent 58%, #00000059 100%), var(--board-cream);
+  box-shadow: 0 3px 8px #0007;
+}
+
+.bieda-ball::after {
+  content: "";
+  position: absolute;
+  left: 6px;
+  top: 16px;
+  width: 32px;
+  height: 11px;
+  border-radius: 4px;
+  transform: rotate(-32deg);
+  background: radial-gradient(circle, #0000002e 0 1.2px, transparent 1.6px) 0 0 / 5px 5px, #d9b48a;
+  box-shadow: 0 1px 2px #0005;
+}
+
+.bieda-stamp {
+  flex: none;
+  padding: 2px 8px;
+  border: 2px solid var(--red);
+  border-radius: 8px;
+  color: var(--red);
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: 22px;
+  transform: rotate(12deg);
+  opacity: 0.9;
+}
+
+.pc-group .pc-top {
+  flex-wrap: wrap;
+  row-gap: 6px;
+}
+
+.pc-group .pc-name {
+  flex-basis: 100%;
+  white-space: normal;
+  line-height: 1.2;
+}
+
+.members {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  font-size: 14px;
+  color: var(--sisal-3);
+}
+
+.members .shooter {
+  color: var(--sisal);
+  font-weight: 700;
+  text-decoration: underline;
+  text-decoration-color: var(--red);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+
+.queue {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 2px 0;
+}
+
+.queue .eyebrow {
+  width: 100%;
+}
+
+.queue-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  font-size: 14px;
+}
+
+.queue-chip i {
+  font-style: normal;
+  font-family: var(--font-display);
+  font-weight: 900;
+  color: var(--brass);
+}
+
+.queue-chip small {
+  color: var(--sisal-3);
+  font-size: 12px;
+}
+
+.groups {
+  display: grid;
+  gap: 10px;
+}
+
+.group-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 4px 10px 12px;
+}
+
+.group-card .chip {
+  padding-right: 12px;
+}
+
+.shuffling .chip {
+  animation: jiggle 0.18s ease-in-out infinite alternate;
+}
+
+.group-pick {
+  padding: 10px 18px;
+  font-family: var(--font-body);
+  text-transform: none;
+  letter-spacing: 0;
+  text-align: left;
+}
+
+.group-pick > span {
+  display: grid;
+  gap: 2px;
+}
+
+.group-pick b {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 24px;
+  text-transform: uppercase;
+}
+
+.group-pick small {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+}
+
 .credit {
   margin-top: auto;
   padding: 36px var(--gut-r) 22px var(--gut-l);

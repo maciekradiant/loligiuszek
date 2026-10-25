@@ -71,11 +71,11 @@ export function playerSheet(sheet) {
       : '';
     const cricket = c.crDarts ? `<span class="eyebrow">Cricket</span><div class="stat-grid">${stat(fmt.f2(c.mpr), 'Znaczniki na rundę')}${stat(c.marks, 'Znaczniki')}</div>` : '';
     const played = (...ids) => ids.some((id) => c.byMode[id]);
-    const cue = played('pool8', 'pool9', 'snooker')
+    const cue = played('pool8', 'pool9', 'snooker', 'bieda')
       ? `<span class="eyebrow">Bilard</span><div class="stat-grid">
           ${stat(c.frames, 'Wygrane partie')}
           ${stat(c.pots, 'Wbite bile')}
-          ${played('pool8', 'pool9') ? stat(c.breakRuns, 'Break & run') : ''}
+          ${played('pool8', 'pool9', 'bieda') ? stat(c.breakRuns, 'Break & run') : ''}
           ${played('snooker') ? `${stat(c.hb || '–', 'Najwyższy brejk')}${stat(c.b50 + c.c100, 'Brejki 50+')}` : ''}
         </div>`
       : '';

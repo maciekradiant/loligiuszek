@@ -1,6 +1,7 @@
 import { S, render, persist, go, toast, ask, addPlayer, playerById } from '../state.js';
 import { ENGINES, CATEGORIES, categoryOf, isCue } from '../engine/registry.js';
 import { buildKnockout } from '../engine/tournament.js';
+import { drawGroups } from '../engine/cue.js';
 import { createSession } from '../session.js';
 import { MODE_INFO, RULE_FIELDS, RULE_HINTS, CATEGORY_INFO, describe } from '../modes-ui.js';
 import { esc, shuffle, nf, plural, clamp } from '../util.js';
@@ -25,7 +26,16 @@ export function newSetup(mode, cat) {
     assign: { ...(last.assign || {}) },
   };
   normalize(su);
+  regroup(su);
   return su;
+}
+
+const isBieda = (su) => su.mode === 'bieda';
+
+// Bieda wersja: random groups (with jokey names) from the chosen players.
+function regroup(su) {
+  if (!isBieda(su)) return;
+  su.bieda = drawGroups(su.selected, su.rules.bieda.groupSize);
 }
 
 // Keeps board assignments valid after players or the board count change.
@@ -57,6 +67,11 @@ function problem(su) {
   const n = su.selected.length;
   const where = su.category === 'bilard' ? 'stole' : 'tarczy';
   if (!n) return 'Wybierz graczy, którzy grają.';
+  if (isBieda(su)) {
+    if (n < 3) return 'Bieda wersja jest dla co najmniej 3 osób. We dwoje zagrajcie w zwykłą ósemkę.';
+    if ((su.bieda?.groups.length || 0) < 2) return 'Za mało osób na dwie grupy. Zmniejsz liczbę osób w grupie.';
+    return null;
+  }
   if (su.format === 'single') {
     if (su.boards > n) return `Na ${nf(su.boards, ...boardForms(su))} potrzeba co najmniej ${su.boards} graczy.`;
     const g = groups(su);
@@ -77,6 +92,7 @@ const boardForms = (su) => (su.category === 'bilard' ? ['stół', 'stoły', 'sto
 function summary(su) {
   const n = su.selected.length;
   const parts = [describe(su.mode, su.rules[su.mode]), nf(n, 'gracz', 'graczy', 'graczy')];
+  if (isBieda(su)) return [...parts, nf(su.bieda?.groups.length || 0, 'grupa', 'grupy', 'grup')].join(' · ');
   if (su.boards > 1) parts.push(nf(su.boards, ...boardForms(su)));
   if (su.format === 'knockout') parts.push('puchar');
   if (su.format === 'league') parts.push('liga');
@@ -99,8 +115,7 @@ export function setupView() {
       ${modeSection(su)}
       ${rulesSection(su, rules)}
       ${playersSection(su)}
-      ${boardsSection(su)}
-      ${orderSection(su)}
+      ${isBieda(su) ? groupsSection(su) : boardsSection(su) + orderSection(su)}
     </div>
     <div class="cta-bar">
       <p class="cta-note ${err ? 'warn' : ''}">${esc(err || summary(su))}</p>
@@ -187,6 +202,38 @@ function boardsSection(su) {
     ${fmt}
     ${boards}
     <p class="hint">${hint}</p>
+  </section>`;
+}
+
+let regrouping = false;
+
+function groupsSection(su) {
+  if (su.selected.length < 3) return '';
+  const { groups, names } = su.bieda || { groups: [], names: [] };
+  const cards = groups
+    .map(
+      (ids, g) => `<div class="group-card" data-key="grp${g}">
+        <div class="board-card-head"><b>${esc(names[g])}</b><span class="faint">${g < 2 ? 'zaczyna przy stole' : `w kolejce · ${g - 1}.`}</span></div>
+        <div class="chips">${ids
+          .map((id) => {
+            const p = playerById(id);
+            return p ? `<span class="chip" data-key="${id}" aria-pressed="true">${avatar(p)}<span>${esc(p.name)}</span></span>` : '';
+          })
+          .join('')}</div>
+      </div>`,
+    )
+    .join('');
+  const uneven = groups.length > 1 && groups[groups.length - 1].length < groups[0].length;
+  return `<section class="section">
+    <div class="section-head"><h2 class="section-title">Grupy</h2><span class="faint">${nf(groups.length, 'grupa', 'grupy', 'grup')}</span></div>
+    <p class="hint">${
+      groups.length > 2
+        ? 'Dwie pierwsze grupy zaczynają przy stole, reszta czeka w kolejce. W grupie gracie na zmianę.'
+        : 'Dwie grupy grają przeciwko sobie, a w grupie gracie na zmianę.'
+    }</p>
+    <div class="row"><button class="btn btn-sm btn-line" data-act="su-regroup">${icon.shuffle}Losuj grupy</button></div>
+    <div id="order-root" class="groups ${regrouping ? 'shuffling' : ''}">${cards}</div>
+    ${uneven ? '<p class="hint">Ostatnia grupa jest mniejsza. To bieda wersja, nikt nie narzeka.</p>' : ''}
   </section>`;
 }
 
@@ -290,13 +337,31 @@ function animateShuffle(finalize) {
 export const setupActions = {
   'su-mode': (el) => {
     su().mode = el.dataset.v;
+    if (isBieda(su()) && !su().bieda) regroup(su());
     render();
   },
   'su-rule': (el) => {
     const raw = el.dataset.v;
     const v = raw === 'true' ? true : raw === 'false' ? false : isNaN(+raw) ? raw : +raw;
     su().rules[su().mode][el.dataset.k] = v;
+    if (el.dataset.k === 'groupSize') regroup(su());
     render();
+  },
+  'su-regroup': () => {
+    if (regrouping) return;
+    regrouping = true;
+    const steps = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 0 : 5;
+    let n = 0;
+    const tick = () => {
+      const last = n++ >= steps;
+      if (last) regrouping = false;
+      flip(document.getElementById('order-root'), () => {
+        regroup(su());
+        render();
+      }, 140);
+      if (!last) setTimeout(tick, 150);
+    };
+    tick();
   },
   'su-legs': (el) => {
     const r = su().rules[su().mode];
@@ -314,6 +379,7 @@ export const setupActions = {
     const id = el.dataset.id;
     s.selected = s.selected.includes(id) ? s.selected.filter((x) => x !== id) : [...s.selected, id];
     normalize(s);
+    regroup(s);
     render();
   },
   'su-add': (form) => {
@@ -326,6 +392,7 @@ export const setupActions = {
     const s = su();
     if (!s.selected.includes(p.id)) s.selected.push(p.id);
     normalize(s);
+    regroup(s);
     input.value = '';
     render();
   },
@@ -366,23 +433,31 @@ export const setupActions = {
       });
       if (!ok) return;
     }
-    const rules = s.rules[s.mode];
-    const boards = s.format === 'single' ? s.boards : Math.max(1, Math.min(s.boards, Math.floor(s.selected.length / 2)));
-    S.session = createSession({
-      mode: s.mode,
-      rules,
-      format: s.format,
-      boards,
-      groups: groups(s),
-      order: s.selected,
-      roster: S.players,
-    });
+    let rules = s.rules[s.mode];
+    const boards = isBieda(s) ? 1 : s.format === 'single' ? s.boards : Math.max(1, Math.min(s.boards, Math.floor(s.selected.length / 2)));
+    if (isBieda(s)) {
+      // One table: players sit in group order and the rules carry the groups by index.
+      const order = s.bieda.groups.flat();
+      const at = new Map(order.map((id, i) => [id, i]));
+      rules = { ...rules, groups: s.bieda.groups.map((g) => g.map((id) => at.get(id))), groupNames: s.bieda.names };
+      S.session = createSession({ mode: s.mode, rules, format: 'single', boards: 1, groups: [order], order, roster: S.players });
+    } else {
+      S.session = createSession({
+        mode: s.mode,
+        rules,
+        format: s.format,
+        boards,
+        groups: groups(s),
+        order: s.selected,
+        roster: S.players,
+      });
+    }
     S.lastSetup[s.category] = { mode: s.mode, rules: s.rules, format: s.format, boards: s.boards, selected: s.selected, assign: s.assign };
     S.ui.board = 0;
     S.ui.entry = '';
     S.ui.mult = 1;
     persist('session', 'lastSetup');
-    if (boards < s.boards) toast(`Wystarczą ${nf(boards, ...boardForms(s))} dla ${s.selected.length} graczy.`);
+    if (!isBieda(s) && boards < s.boards) toast(`Wystarczą ${nf(boards, ...boardForms(s))} dla ${s.selected.length} graczy.`);
     go('game');
   },
 };
