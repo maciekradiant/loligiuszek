@@ -4,7 +4,7 @@ import { say } from '../audio.js';
 import { icon, tabbar, switchRow, seg, sheetFrame } from './common.js';
 import { esc } from '../util.js';
 
-export const APP_VERSION = '1.0.0';
+export const APP_VERSION = '1.1.0';
 
 const standalone = () => window.matchMedia?.('(display-mode: standalone)').matches || window.navigator.standalone === true;
 
@@ -143,7 +143,7 @@ export const settingsActions = {
     S.players = [];
     S.history = [];
     S.session = null;
-    S.lastSetup = null;
+    S.lastSetup = {};
     S.settings = { ...DEFAULT_SETTINGS };
     persist('players', 'history', 'session', 'lastSetup', 'settings');
     toast('Wszystkie dane usunięte');

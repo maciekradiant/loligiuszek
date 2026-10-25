@@ -6,7 +6,9 @@
 //          { k: 'v', v, n }   a whole X01 visit typed as a total, thrown with n darts
 //          { k: 'x' }         end the turn early (remaining darts count as misses)
 
-import { ENGINES, newStats } from './modes.js';
+import { newStats } from './modes.js';
+import { CUE_ENGINES, replayCue } from './cue.js';
+import { ENGINES } from './registry.js';
 import { canCheckout, deadScore, isValidVisit, minDartsToFinish } from './darts.js';
 
 const fill = (n, v) => Array.from({ length: n }, () => v);
@@ -39,6 +41,7 @@ export function matchState(match) {
 }
 
 export function replay(match) {
+  if (CUE_ENGINES[match.mode]) return replayCue(match);
   const eng = ENGINES[match.mode];
   const n = match.players.length;
   const R = {

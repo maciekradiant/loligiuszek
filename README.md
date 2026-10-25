@@ -1,6 +1,6 @@
-# Lotka — licznik do darta na iPhone’a
+# Lotka — licznik do darta i bilarda na iPhone’a
 
-Lotka liczy punkty w darcie, losuje kolejność rzucających, rozdziela graczy na kilka tarcz i prowadzi turnieje. Działa jak zwykła aplikacja: z ikoną na ekranie początkowym, na pełnym ekranie i bez internetu. To aplikacja webowa (PWA), więc nie potrzebuje App Store ani Maca.
+Lotka liczy punkty w darcie i w bilardzie, losuje kolejność, rozdziela graczy na kilka tarcz albo stołów i prowadzi turnieje. Między kategoriami przełączasz się na stronie głównej. Działa jak zwykła aplikacja: z ikoną na ekranie początkowym, na pełnym ekranie i bez internetu. To aplikacja webowa (PWA), więc nie potrzebuje App Store ani Maca.
 
 ## Co potrafi
 
@@ -11,10 +11,16 @@ Lotka liczy punkty w darcie, losuje kolejność rzucających, rozdziela graczy n
 - **Shanghai**: 7, 10 albo 20 rund. Single, double i treble w jednej turze to natychmiastowa wygrana. Remis rozstrzyga dogrywka na bullu.
 - **Killer**: każdy losuje numer, po trafieniu własnego zostaje killerem i odbiera życia rywalom.
 
+**Tryby bilardowe**
+- **Ósemka**: bile do stukania, grupy (pełne/połówki) przypisują się same po rozbiciu, przy ósemce pytanie, kto wygrał partię.
+- **Dziewiątka**: podświetlona najniższa bila na stole, wbicie dziewiątki kończy partię, zasada trzech fauli z rzędu.
+- **Snooker**: 15, 10 albo 6 czerwonych. Punkty, aktualny brejk, punkty na stole, różnica, „potrzebne snookery”, faule 4–7, remis na czarnej.
+- Gra do ustalonej liczby wygranych partii, rozbicie na zmianę albo przez zwycięzcę, statystyki: break & run, najdłuższa seria, najwyższy brejk.
+
 **Gracze, kolejność i tarcze**
 - Zapisana lista graczy z kolorami. Wybierasz, kto gra, albo dopisujesz nowe osoby w trakcie zakładania gry.
 - Kolejność: animowane losowanie albo przeciąganie za uchwyt. W kolejnych legach zaczyna następny gracz.
-- **1–4 tarcze**: gracze dzielą się na tarcze (ręcznie albo losowo) i każda tarcza gra swój mecz. Przełączasz się zakładkami.
+- **1–4 tarcze albo stoły**: gracze dzielą się na tarcze/stoły (ręcznie albo losowo) i każde stanowisko gra swój mecz. Przełączasz się zakładkami.
 - Legi i sety, np. „do 3 wygranych legów” albo „do 2 setów po 3 legi”.
 
 **Turnieje**
@@ -62,8 +68,8 @@ npm test
 ```
 index.html, manifest.webmanifest, sw.js   powłoka aplikacji, instalacja i tryb offline
 css/app.css                               wygląd
-js/engine/                                zasady gry: punktacja, zamknięcia, statystyki, turnieje
-js/views/                                 ekrany: start, nowa gra, gra, gracze, wyniki, opcje
+js/engine/                                zasady gry: dart (modes.js), bilard (cue.js), statystyki, turnieje
+js/views/                                 ekrany: start, nowa gra, gra (dart i bilard), gracze, wyniki, opcje
 js/session.js                             tarcze i mecze jednej sesji
 tests/                                    testy silnika
 ```

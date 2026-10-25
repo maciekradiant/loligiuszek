@@ -1,7 +1,7 @@
 // Offline support: the app shell is cached on install and served cache-first, then refreshed in
 // the background so the next launch picks up updates. Bump VERSION when shipping changes.
 
-const VERSION = 'lotka-1.0.0';
+const VERSION = 'lotka-1.1.0';
 const SHELL = [
   './',
   'index.html',
@@ -21,6 +21,8 @@ const SHELL = [
   'js/engine/match.js',
   'js/engine/stats.js',
   'js/engine/tournament.js',
+  'js/engine/cue.js',
+  'js/engine/registry.js',
   'js/views/common.js',
   'js/views/home.js',
   'js/views/setup.js',
@@ -28,6 +30,7 @@ const SHELL = [
   'js/views/players.js',
   'js/views/history.js',
   'js/views/settings.js',
+  'js/views/cue.js',
   'icons/apple-touch-icon.png',
   'icons/icon-192.png',
   'icons/icon-512.png',

@@ -90,6 +90,72 @@ export function drawBoard(canvas, { numbers = true, highlight = null } = {}) {
   }
 }
 
+// A racked set of pool balls with the cue ball waiting, for the billiards hero.
+const RACK = [[1], [11, 5], [2, 8, 10], [9, 7, 14, 4], [6, 15, 13, 3, 12]];
+
+function drawPoolBall(g, x, y, r, n, font) {
+  const base = n === 0 ? css('--board-cream') : css(`--ball-${n > 8 ? n - 8 : n}`) || '#c33';
+  const cream = css('--board-cream') || '#e8dcbc';
+  g.save();
+  g.beginPath();
+  g.arc(x, y, r, 0, Math.PI * 2);
+  g.clip();
+  g.fillStyle = n > 8 || n === 0 ? cream : base;
+  g.fillRect(x - r, y - r, r * 2, r * 2);
+  if (n > 8) {
+    g.fillStyle = base;
+    g.fillRect(x - r, y - r * 0.56, r * 2, r * 1.12);
+  }
+  if (n > 0) {
+    g.beginPath();
+    g.arc(x, y, r * 0.44, 0, Math.PI * 2);
+    g.fillStyle = cream;
+    g.fill();
+    g.fillStyle = css('--ink') || '#0e0d0b';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.font = `800 ${Math.round(r * 0.62)}px ${font}`;
+    g.fillText(String(n), x, y + r * 0.04);
+  }
+  const shine = g.createRadialGradient(x - r * 0.4, y - r * 0.45, r * 0.05, x, y, r * 1.05);
+  shine.addColorStop(0, 'rgba(255,255,255,0.55)');
+  shine.addColorStop(0.25, 'rgba(255,255,255,0.08)');
+  shine.addColorStop(0.75, 'rgba(0,0,0,0)');
+  shine.addColorStop(1, 'rgba(0,0,0,0.45)');
+  g.fillStyle = shine;
+  g.fillRect(x - r, y - r, r * 2, r * 2);
+  g.restore();
+}
+
+export function drawRack(canvas) {
+  if (!canvas) return;
+  const dpr = Math.min(window.devicePixelRatio || 1, 3);
+  const size = canvas.clientWidth || 280;
+  canvas.width = size * dpr;
+  canvas.height = size * dpr;
+  const g = canvas.getContext('2d');
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, size, size);
+  const font = css('--font-display') || 'sans-serif';
+  const r = size * 0.072;
+  g.save();
+  g.translate(size * 0.24, size * 0.52);
+  g.rotate(-0.32);
+  RACK.forEach((row, i) => {
+    row.forEach((n, j) => {
+      const x = i * r * 1.75;
+      const y = (j - (row.length - 1) / 2) * r * 2.04;
+      g.beginPath();
+      g.arc(x + r * 0.12, y + r * 0.2, r, 0, Math.PI * 2);
+      g.fillStyle = 'rgba(0,0,0,0.35)';
+      g.fill();
+      drawPoolBall(g, x, y, r, n, font);
+    });
+  });
+  g.restore();
+  drawPoolBall(g, size * 0.07, size * 0.66, r * 0.92, 0, font);
+}
+
 let confettiRaf = 0;
 
 export function confetti(canvas, { count = 160, duration = 2600 } = {}) {

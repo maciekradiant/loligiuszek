@@ -1,10 +1,11 @@
-import { S, render, go } from '../state.js';
-import { MODE_IDS } from '../engine/modes.js';
+import { S, render, go, persist } from '../state.js';
+import { CATEGORIES, isCue } from '../engine/registry.js';
 import { matchState } from '../engine/match.js';
 import { boardMatch } from '../session.js';
-import { MODE_INFO, describe } from '../modes-ui.js';
-import { esc, timeAgo, nf } from '../util.js';
-import { icon, avatar, tabbar } from './common.js';
+import { MODE_INFO, CATEGORY_INFO, describe } from '../modes-ui.js';
+import { esc, nf } from '../util.js';
+import { icon, tabbar, categorySwitch } from './common.js';
+import { ball } from './cue.js';
 import { newSetup } from './setup.js';
 
 function liveScores(ses) {
@@ -14,15 +15,16 @@ function liveScores(ses) {
   const st = R.leg.st;
   const value = (i) => {
     if (m.mode === 'x01') return st.rem[i];
-    if (m.mode === 'cricket' || m.mode === 'shanghai') return st.pts[i];
+    if (m.mode === 'cricket' || m.mode === 'shanghai' || m.mode === 'snooker') return st.pts[i];
     if (m.mode === 'killer') return `${st.lives[i]}♦`;
     if (m.mode === 'clock') return st.pos[i];
+    if (isCue(m.mode)) return R.legsInSet[i];
     return '';
   };
-  return `<div class="resume-scores">${m.players
+  return `<span class="resume-scores">${m.players
     .slice(0, 4)
     .map((p, i) => `<span>${esc(p.name.split(' ')[0])} <b>${value(i)}</b></span>`)
-    .join('')}${m.players.length > 4 ? `<span class="faint">+${m.players.length - 4}</span>` : ''}</div>`;
+    .join('')}</span>`;
 }
 
 function resumeCard() {
@@ -32,68 +34,53 @@ function resumeCard() {
     const m = boardMatch(ses, b);
     return !m || !m.finished;
   });
-  const what = ses.format === 'knockout' ? 'Puchar' : ses.format === 'league' ? 'Liga' : live ? 'Trwa gra' : 'Mecz zakończony';
-  const boards = ses.boards.length > 1 ? ` · ${nf(ses.boards.length, 'tarcza', 'tarcze', 'tarcz')}` : '';
+  const what = ses.format === 'knockout' ? 'Puchar' : ses.format === 'league' ? 'Liga' : live ? 'Trwa gra' : 'Koniec meczu';
+  const boards = ses.boards.length > 1 ? ` · ${nf(ses.boards.length, ...boardForms(ses.mode))}` : '';
   return `<button class="resume" data-act="go" data-to="game">
-    <span class="row">${live ? '<span class="live-dot"></span>' : ''}<span class="eyebrow" style="color:var(--sisal)">${what}${boards}</span></span>
-    <span class="display" style="font-size:30px;text-transform:uppercase">${esc(describe(ses.mode, ses.rules))}</span>
-    ${liveScores(ses)}
-    <span class="row link">${live ? 'Wróć do gry' : 'Zobacz wynik'} ${icon.next}</span>
+    <span class="grow">
+      <span class="row">${live ? '<span class="live-dot"></span>' : ''}<span class="eyebrow">${what}${boards}</span></span>
+      <b class="resume-title">${esc(describe(ses.mode, ses.rules))}</b>
+      ${liveScores(ses)}
+    </span>
+    ${icon.chev}
   </button>`;
 }
 
-function quickAgain() {
-  const last = S.lastSetup;
-  if (!last || S.session) return '';
-  const names = (last.selected || [])
-    .map((id) => S.players.find((p) => p.id === id)?.name)
-    .filter(Boolean);
-  if (!names.length) return '';
-  return `<button class="list-card list-row" style="padding:14px" data-act="new-game" data-mode="${last.mode}">
-    <span class="grow"><small>Zagraj jeszcze raz</small><b>${esc(describe(last.mode, last.rules[last.mode]))} · ${esc(names.slice(0, 3).join(', '))}${names.length > 3 ? ` +${names.length - 3}` : ''}</b></span>${icon.chev}
-  </button>`;
-}
+const boardForms = (mode) => (isCue(mode) ? ['stół', 'stoły', 'stołów'] : ['tarcza', 'tarcze', 'tarcz']);
 
-function recent() {
-  const items = S.history.slice(0, 3);
-  if (!items.length) return '';
-  return `<section class="section">
-    <div class="section-head"><h2 class="section-title">Ostatnie mecze</h2><button class="link" data-act="go" data-to="history">Wszystkie</button></div>
-    <div class="list-card">${items
-      .map((h) => {
-        const w = h.players.find((p) => p.id === h.winnerId);
-        const vs = h.players.map((p) => esc(p.name)).join(' · ');
-        return `<button class="list-row" data-act="history-detail" data-id="${h.id}">${avatar(w)}<span class="grow"><b>${esc(w?.name || '')} wygrywa</b><small>${esc(h.label)} · ${vs}</small></span><span class="faint" style="font-size:12px">${timeAgo(h.ts)}</span></button>`;
-      })
-      .join('')}</div>
-  </section>`;
+function modeGlyph(id) {
+  if (id === 'pool8') return ball(8, 'glyph-ball');
+  if (id === 'pool9') return ball(9, 'glyph-ball');
+  if (id === 'snooker') return '<span class="ball sn glyph-ball" style="--ball:var(--sn-1)"><i>15</i></span>';
+  return `<span class="mode-row-text">${MODE_INFO[id].glyph}</span>`;
 }
 
 export function homeView() {
-  const tiles = MODE_IDS.map((id, i) => {
-    const info = MODE_INFO[id];
-    return `<button class="mode-tile ${i === 0 ? 'wide' : ''}" data-act="new-game" data-mode="${id}">
-      <span class="mode-glyph" aria-hidden="true">${info.glyph}</span>
-      <b>${info.name}</b>
-      <span>${info.desc}</span>
-    </button>`;
-  }).join('');
+  const cat = S.settings.category;
+  const info = CATEGORY_INFO[cat];
+  const rows = CATEGORIES[cat]
+    .map(
+      (id) => `<button class="mode-row" data-act="new-game" data-mode="${id}" data-key="${id}">
+        <span class="mode-row-glyph" aria-hidden="true">${modeGlyph(id)}</span>
+        <span class="grow"><b>${MODE_INFO[id].name}</b><small>${MODE_INFO[id].short}</small></span>
+        ${icon.chev}
+      </button>`,
+    )
+    .join('');
   return `<div class="screen">
-    <div class="scroll" style="padding-left:0;padding-right:0;padding-top:0">
-      <header class="hero">
-        <canvas id="hero-board" data-keep aria-hidden="true"></canvas>
-        <h1 class="wordmark">Lotka<small>Licznik punktów do darta</small></h1>
+    <div class="scroll home-scroll">
+      <header class="hero" data-cat="${cat}">
+        <canvas id="hero-dart" class="hero-art art-dart" data-keep aria-hidden="true"></canvas>
+        <canvas id="hero-cue" class="hero-art art-cue" data-keep aria-hidden="true"></canvas>
+        <h1 class="wordmark">Lotka<small>${info.tagline}</small></h1>
       </header>
-      <div style="padding-left:var(--gut-l);padding-right:var(--gut-r)" class="stack">
+      <div class="home-body">
+        ${categorySwitch(cat)}
         ${resumeCard()}
-        <button class="btn btn-primary btn-block" data-act="new-game">${S.session ? 'Nowa gra' : 'Zacznij grę'}</button>
-        ${quickAgain()}
-        <section class="section">
-          <h2 class="section-title">Tryby gry</h2>
-          <div class="mode-grid">${tiles}</div>
-        </section>
-        ${recent()}
+        <button class="btn btn-primary btn-block" data-act="new-game">Nowa gra</button>
+        <div class="list-card mode-list">${rows}</div>
       </div>
+      <footer class="credit"><i class="credit-rule" aria-hidden="true"></i><span><b>radiant</b> to zrobił</span></footer>
     </div>
     ${tabbar('home')}
   </div>`;
@@ -101,7 +88,13 @@ export function homeView() {
 
 export const homeActions = {
   'new-game': (el) => {
-    S.ui.setup = newSetup(el.dataset.mode);
+    S.ui.setup = newSetup(el.dataset.mode, S.settings.category);
     go('setup');
+  },
+  category: (el) => {
+    if (S.settings.category === el.dataset.v) return;
+    S.settings.category = el.dataset.v;
+    persist('settings');
+    render();
   },
 };

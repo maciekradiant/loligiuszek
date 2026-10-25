@@ -5,17 +5,20 @@ import { checkoutRoute, dartLabel } from '../engine/darts.js';
 import { avg3, pct, statRows, fmt } from '../engine/stats.js';
 import { roundName, knockoutRounds, standings, nextTie } from '../engine/tournament.js';
 import { boardMatch, boardStatus, startNextOnBoard, completeMatch, reopenMatch, canReopen, rematch, busyPlayers } from '../session.js';
-import { say, thud, chime } from '../audio.js';
+import { say, thud, chime, clack } from '../audio.js';
 import { esc, plural, uid, clamp } from '../util.js';
 import { icon, avatar, colorVar, pips, markSvg, sheetFrame } from './common.js';
-import { describe } from '../modes-ui.js';
+import { describe, categoryInfo } from '../modes-ui.js';
+import { isCue } from '../engine/registry.js';
+import { cueScoreboard, cueTurnStrip, cuePad, cueSheet, isCueSheet } from './cue.js';
 
 const firstName = (name) => String(name).split(' ')[0];
 const boardIdx = () => clamp(S.ui.board, 0, S.session.boards.length - 1);
 const currentMatch = () => (S.session ? boardMatch(S.session, boardIdx()) : null);
 
-export function formatLabel(rules) {
+export function formatLabel(rules, mode) {
   const { legs = 1, sets = 1 } = rules;
+  if (isCue(mode)) return legs > 1 ? `do ${legs} wygranych partii` : 'jedna partia';
   if (sets > 1) return `do ${sets} setów · set do ${legs} ${plural(legs, 'lega', 'legów', 'legów')}`;
   if (legs > 1) return `do ${legs} wygranych legów`;
   return 'jeden leg';
@@ -41,6 +44,7 @@ export function gameView() {
   let body;
   if (!m) body = idleView(ses, b);
   else if (R.winner !== null) body = resultView(ses, m, R);
+  else if (isCue(m.mode)) body = `<div class="scoreboard">${cueScoreboard(m, R)}</div>${cueTurnStrip(m, R)}${cuePad(m, R)}`;
   else body = `<div class="scoreboard">${scoreboard(m, R)}</div>${turnStrip(m, R)}${pad(m, R)}`;
   return `<div class="screen game">${head(ses, m, R)}${boardTabs(ses, b)}${body}${flashView()}${overlayView()}<canvas class="fx-canvas" id="fx" data-keep></canvas></div>`;
 }
@@ -49,12 +53,14 @@ function head(ses, m, R) {
   const parts = [];
   const tie = tieOf(ses, m);
   if (tie) parts.push(tieLabel(ses, tie));
-  if (R && R.winner === null) {
+  if (R && R.winner === null && isCue(m.mode)) {
+    parts.push(`Partia ${R.legNo + 1}`, `rozbija ${firstName(m.players[R.leg.starter].name)}`);
+  } else if (R && R.winner === null) {
     if (ses.rules.sets > 1) parts.push(`Set ${R.setNo}`);
     if (ses.rules.legs > 1 || ses.rules.sets > 1) parts.push(`Leg ${R.legNo + 1}`);
     if (m.mode !== 'x01' && m.mode !== 'shanghai') parts.push(`Runda ${R.leg.round}`);
   }
-  parts.push(formatLabel(ses.rules));
+  parts.push(formatLabel(ses.rules, ses.mode));
   return `<header class="bar-head">
     <button class="icon-btn" data-act="go" data-to="home" aria-label="Menu główne">${icon.back}</button>
     <div class="bar-title"><strong>${esc(describe(ses.mode, ses.rules))}</strong><span>${esc(parts.join(' · '))}</span></div>
@@ -67,9 +73,10 @@ function boardTabs(ses, cur) {
   const tabs = ses.boards.map((_, b) => {
     const m = boardMatch(ses, b);
     const st = boardStatus(ses, b);
-    let label = st === 'waiting' ? 'wolna' : st === 'done' ? 'koniec' : '';
+    const cue = isCue(ses.mode);
+    let label = st === 'waiting' ? (cue ? 'wolny' : 'wolna') : st === 'done' ? 'koniec' : '';
     if (m) label = m.players.slice(0, 2).map((p) => esc(firstName(p.name))).join(' · ') + (m.players.length > 2 ? ` +${m.players.length - 2}` : '');
-    return `<button class="board-tab" data-act="board" data-b="${b}" aria-pressed="${b === cur}"><span class="status-dot ${st}"></span><b>T${b + 1}</b>${label}</button>`;
+    return `<button class="board-tab" data-act="board" data-b="${b}" aria-pressed="${b === cur}"><span class="status-dot ${st}"></span><b>${categoryInfo(ses.mode).boardShort}${b + 1}</b>${label}</button>`;
   });
   if (ses.format !== 'single') tabs.push(`<button class="board-tab" data-act="bracket">${ses.format === 'knockout' ? 'Drabinka' : 'Tabela'}</button>`);
   return `<div class="board-tabs">${tabs.join('')}</div>`;
@@ -425,7 +432,7 @@ function statsTable(m, R) {
     const cells = m.players.map((_, i) => `<td>${statRows(m.mode, R.stats[i])[r][1]}</td>`).join('');
     return `<tr><td>${statRows(m.mode, R.stats[0])[r][0]}</td>${cells}</tr>`;
   });
-  const legs = `<tr><td>Wygrane legi</td>${m.players.map((_, i) => `<td>${R.stats[i].legs}</td>`).join('')}</tr>`;
+  const legs = `<tr><td>Wygrane ${isCue(m.mode) ? 'partie' : 'legi'}</td>${m.players.map((_, i) => `<td>${R.stats[i].legs}</td>`).join('')}</tr>`;
   return `<div class="table-wrap"><table class="table"><thead><tr><th>Statystyka</th>${cols}</tr></thead><tbody>${legs}${rows.join('')}</tbody></table></div>`;
 }
 
@@ -490,16 +497,16 @@ function idleView(ses, b) {
   if (tie) {
     const [a, c] = tie.players.map(byId);
     return `<div class="idle"><div>
-      <div class="eyebrow">Tarcza ${b + 1} · ${esc(tieLabel(ses, tie))}</div>
-      <div class="display">Wolna tarcza</div>
+      <div class="eyebrow">${categoryInfo(ses.mode).board} ${b + 1} · ${esc(tieLabel(ses, tie))}</div>
+      <div class="display">${isCue(ses.mode) ? 'Wolny stół' : 'Wolna tarcza'}</div>
       <div class="vs">${avatar(a)}<span>${esc(a.name)}</span><i>vs</i><span>${esc(c.name)}</span>${avatar(c)}</div>
       <button class="btn btn-primary btn-block" data-act="next-match">Rozpocznij mecz</button>
     </div></div>`;
   }
   return `<div class="idle"><div>
-    <div class="eyebrow">Tarcza ${b + 1}</div>
+    <div class="eyebrow">${categoryInfo(ses.mode).board} ${b + 1}</div>
     <div class="display">Chwila przerwy</div>
-    <p>Kolejny mecz zacznie się, gdy skończą się trwające mecze na innych tarczach.</p>
+    <p>Kolejny mecz zacznie się, gdy skończą się trwające mecze na ${isCue(ses.mode) ? 'innych stołach' : 'innych tarczach'}.</p>
     <button class="btn" data-act="bracket">${ses.format === 'knockout' ? 'Zobacz drabinkę' : 'Zobacz tabelę'}</button>
   </div></div>`;
 }
@@ -554,7 +561,8 @@ function push(ev) {
   const R = pushEvent(m, ev);
   S.ui.mult = 1;
   S.ui.entry = '';
-  feedback(m, R, ev, notesBefore);
+  if (isCue(m.mode)) cueFeedback(m, R, ev, before);
+  else feedback(m, R, ev, notesBefore);
   if (R.winner !== null) finishMatch(m, R);
   persist('session');
   render();
@@ -562,6 +570,48 @@ function push(ev) {
 
 function speak(text, opts) {
   if (S.settings.caller) say(text, opts);
+}
+
+function cueFeedback(m, R, ev, before) {
+  const sounds = S.settings.sounds;
+  const last = R.last;
+  if (!last) return;
+  const name = (i) => m.players[i].name;
+  if (ev.k === 'pot' && sounds) clack();
+  if (m.mode === 'snooker' && last.type === 'pot') {
+    const was = before.leg.turn.pts;
+    const now = last.turn.pts;
+    if (was < 100 && now >= 100) flash('Setka');
+    else if (was < 50 && now >= 50) flash('50+', 'good');
+    if (R.leg.st.respot && !before.leg.st.respot) {
+      flash('Remis', 'good');
+      speak('Remis. Czarna wraca na stół.');
+    } else speak(String(now));
+  }
+  if (last.type === 'foul' || (last.turn?.foul && (last.type === 'leg' || last.type === 'match'))) {
+    flash('Faul', 'bust');
+    if (sounds) chime('bust');
+    const p = last.type === 'foul' ? last.p : last.turn.p;
+    if (m.mode === 'snooker') speak(`Faul. ${ev.v} dla ${name(1 - p)}`);
+    else speak('Faul');
+    if (m.mode === 'pool9' && R.rules.threeFoul && last.type === 'foul' && R.leg.fouls[p] === 2) {
+      toast(`${name(p)}: dwa faule z rzędu. Trzeci oznacza przegraną partię.`, 'warn');
+    }
+  }
+  if (last.type === 'leg' || last.type === 'match') {
+    if (last.threeFoul) flash('3 faule', 'bust');
+    else if (last.runOut) flash('Break & run');
+    if (sounds) chime(last.type === 'match' ? 'win' : 'big');
+    const [a, b] = R.legsInSet;
+    if (last.type === 'leg') {
+      const pts = m.mode === 'snooker' ? ` · ${last.leg.st.pts[0]}:${last.leg.st.pts[1]}` : '';
+      overlay({ eyebrow: `Partia ${last.leg.no + 1}${pts}`, title: name(last.p), sub: `wygrywa partię · ${a} : ${b}` });
+      speak(`Partia dla ${name(last.p)}. ${a} do ${b}.`, { interrupt: false });
+    } else {
+      speak(`Mecz wygrywa ${name(last.p)}!`, { interrupt: false });
+      S.ui.confetti = true;
+    }
+  }
 }
 
 function feedback(m, R, ev, notesBefore) {
@@ -659,7 +709,7 @@ function finishMatch(m, R) {
     legs: R.stats.map((s) => s.legs),
     sets: R.stats.map((s) => s.sets),
     stats: Object.fromEntries(m.players.map((p, i) => [p.id, R.stats[i]])),
-    context: tie ? `${ses.format === 'knockout' ? 'Puchar' : 'Liga'} · ${tieLabel(ses, tie)}` : ses.boards.length > 1 ? `Tarcza ${boardIdx() + 1}` : '',
+    context: tie ? `${ses.format === 'knockout' ? 'Puchar' : 'Liga'} · ${tieLabel(ses, tie)}` : ses.boards.length > 1 ? `${categoryInfo(ses.mode).board} ${boardIdx() + 1}` : '',
   };
   S.history.unshift(entry);
   m.historyId = entry.id;
@@ -734,6 +784,32 @@ function undo() {
 }
 
 export const gameActions = {
+  'cue-pot': (el) => {
+    const b = +el.dataset.b;
+    const m = currentMatch();
+    if (m?.mode === 'pool8' && b === 8) return openSheet('cue-frame', { reason: '8' });
+    push({ k: 'pot', b });
+  },
+  'cue-miss': () => push({ k: 'miss' }),
+  'cue-foul': () => {
+    const m = currentMatch();
+    if (m?.mode === 'snooker') return openSheet('cue-foul', { red: false });
+    push({ k: 'foul' });
+  },
+  'cue-foul-red': () => {
+    S.ui.sheet.red = !S.ui.sheet.red;
+    render();
+  },
+  'cue-foul-v': (el) => {
+    const red = !!S.ui.sheet?.red;
+    S.ui.sheet = null;
+    push({ k: 'foul', v: +el.dataset.v, red });
+  },
+  'cue-frame-open': () => openSheet('cue-frame', {}),
+  'cue-frame': (el) => {
+    S.ui.sheet = null;
+    push({ k: 'frame', p: +el.dataset.p });
+  },
   board: (el) => {
     S.ui.board = +el.dataset.b;
     S.ui.entry = '';
@@ -848,10 +924,14 @@ export function gameSheet(sheet) {
   }
   if (sheet.type === 'match-stats') {
     const m = currentMatch();
-    if (!m) return sheetFrame('Statystyki', '<p class="hint">Na tej tarczy nie trwa żaden mecz.</p>');
+    if (!m) return sheetFrame('Statystyki', `<p class="hint">Na ${isCue(ses.mode) ? 'tym stole' : 'tej tarczy'} nie trwa żaden mecz.</p>`);
     return sheetFrame('Statystyki', statsTable(m, matchState(m)));
   }
   if (sheet.type === 'bracket') return sheetFrame(ses.format === 'knockout' ? 'Drabinka' : 'Tabela', bracketBody(ses));
+  if (isCueSheet(sheet.type)) {
+    const m = currentMatch();
+    return cueSheet(sheet, m, m && matchState(m));
+  }
   return '';
 }
 
@@ -875,7 +955,7 @@ function bracketBody(ses) {
         return `<div class="tie-p ${cls}">${avatar(byId(pid), 'av-sm')}<span class="tie-name">${name(pid)}</span>${legs}</div>`;
       })
       .join('');
-    const meta = live ? `Teraz · tarcza ${boardOf(t.key) + 1}` : label;
+    const meta = live ? `Teraz · ${categoryInfo(ses.mode).board.toLowerCase()} ${boardOf(t.key) + 1}` : label;
     return `<div class="tie ${live ? 'live' : ''}">${meta ? `<div class="tie-meta">${meta}</div>` : ''}${ps}</div>`;
   };
   if (ses.format === 'knockout') {

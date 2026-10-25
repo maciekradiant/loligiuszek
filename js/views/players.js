@@ -9,7 +9,7 @@ export function playersView() {
     .map((p) => {
       const c = careerStats(p.id, S.history);
       const line = c.matches
-        ? `${nf(c.matches, 'mecz', 'mecze', 'meczów')} · ${c.wins} ${c.wins === 1 ? 'wygrana' : 'wygranych'}${c.darts ? ` · śr. ${fmt.f1(c.avg)}` : ''}`
+        ? `${nf(c.matches, 'mecz', 'mecze', 'meczów')} · ${c.wins} ${c.wins === 1 ? 'wygrana' : 'wygranych'}${c.darts ? ` · śr. ${fmt.f1(c.avg)}` : ''}${c.hb ? ` · brejk ${c.hb}` : ''}`
         : 'Jeszcze bez meczów';
       return `<button class="list-row" data-act="player" data-id="${p.id}" data-key="${p.id}">${avatar(p)}<span class="grow"><b>${esc(p.name)}</b><small>${line}</small></span>${icon.chev}</button>`;
     })
@@ -70,6 +70,15 @@ export function playerSheet(sheet) {
         </div>`
       : '';
     const cricket = c.crDarts ? `<span class="eyebrow">Cricket</span><div class="stat-grid">${stat(fmt.f2(c.mpr), 'Znaczniki na rundę')}${stat(c.marks, 'Znaczniki')}</div>` : '';
+    const played = (...ids) => ids.some((id) => c.byMode[id]);
+    const cue = played('pool8', 'pool9', 'snooker')
+      ? `<span class="eyebrow">Bilard</span><div class="stat-grid">
+          ${stat(c.frames, 'Wygrane partie')}
+          ${stat(c.pots, 'Wbite bile')}
+          ${played('pool8', 'pool9') ? stat(c.breakRuns, 'Break & run') : ''}
+          ${played('snooker') ? `${stat(c.hb || '–', 'Najwyższy brejk')}${stat(c.b50 + c.c100, 'Brejki 50+')}` : ''}
+        </div>`
+      : '';
     return sheetFrame(
       esc(p.name),
       `<div class="row">${avatar(p, 'av-lg')}<div class="grow"><b style="font-size:18px">${esc(p.name)}</b><div class="faint">W Lotce od ${new Date(p.created).toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' })}</div></div></div>
@@ -79,7 +88,7 @@ export function playerSheet(sheet) {
         ${stat(`${c.winRate}%`, 'Procent wygranych')}
         ${c.byMode.killer ? stat(c.kills, 'Eliminacje w Killerze') : stat(favourite(c), 'Ulubiony tryb')}
       </div>
-      ${x01}${cricket}
+      ${x01}${cricket}${cue}
       <span class="eyebrow">Edycja</span>
       <form class="add-player" data-form="player-rename" data-id="${p.id}" autocomplete="off">
         <input type="text" id="rename-${p.id}" name="name" value="${esc(p.name)}" maxlength="24" aria-label="Imię">
@@ -144,7 +153,7 @@ export const playerActions = {
     });
     if (!ok) return;
     S.players = S.players.filter((x) => x.id !== p.id);
-    if (S.lastSetup) S.lastSetup.selected = S.lastSetup.selected.filter((id) => id !== p.id);
+    for (const last of Object.values(S.lastSetup)) last.selected = (last.selected || []).filter((id) => id !== p.id);
     persist('players', 'lastSetup');
     render();
   },

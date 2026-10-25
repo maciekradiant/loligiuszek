@@ -28,6 +28,7 @@ export const DEFAULT_SETTINGS = {
   wakeLock: true,
   inputMode: 'total',
   hints: true,
+  category: 'dart',
 };
 
 export const HISTORY_LIMIT = 500;
@@ -38,8 +39,14 @@ export function load() {
     history: read('history', []),
     settings: { ...DEFAULT_SETTINGS, ...read('settings', {}) },
     session: read('session', null),
-    lastSetup: read('lastSetup', null),
+    lastSetup: migrateLastSetup(read('lastSetup', null)),
   };
+}
+
+// Version 1.0 kept a single darts setup; now each category remembers its own.
+function migrateLastSetup(v) {
+  if (!v) return {};
+  return v.mode ? { dart: v } : v;
 }
 
 export const save = {

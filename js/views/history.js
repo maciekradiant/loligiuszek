@@ -1,7 +1,10 @@
 import { S, render, persist, openSheet, closeSheet, ask } from '../state.js';
 import { careerStats, statRows, fmt } from '../engine/stats.js';
 import { esc, timeAgo, duration, nf } from '../util.js';
-import { icon, avatar, tabbar, sheetFrame, seg } from './common.js';
+import { icon, avatar, tabbar, sheetFrame, seg, categorySwitch } from './common.js';
+import { categoryOf } from '../engine/registry.js';
+
+const inCategory = () => S.history.filter((h) => categoryOf(h.mode) === S.settings.category);
 
 function matchCard(h) {
   const two = h.players.length === 2;
@@ -24,31 +27,39 @@ function matchCard(h) {
 }
 
 function ranking() {
+  const history = inCategory();
+  const cue = S.settings.category === 'bilard';
   const rows = S.players
-    .map((p) => ({ p, c: careerStats(p.id, S.history) }))
+    .map((p) => ({ p, c: careerStats(p.id, history) }))
     .filter((r) => r.c.matches)
-    .sort((a, b) => b.c.wins - a.c.wins || b.c.winRate - a.c.winRate || b.c.avg - a.c.avg);
+    .sort((a, b) => b.c.wins - a.c.wins || b.c.winRate - a.c.winRate || b.c.avg - a.c.avg || b.c.frames - a.c.frames);
   if (!rows.length) return `<div class="empty"><div class="display">Brak danych</div><p>Ranking pojawi się po pierwszym rozegranym meczu.</p></div>`;
+  const extra = cue
+    ? { head: '<th>Partie</th><th>Brejk</th>', cells: (c) => `<td>${c.frames}</td><td>${c.hb || '–'}</td>` }
+    : { head: '<th>Śr.</th><th>180</th>', cells: (c) => `<td>${c.darts ? fmt.f1(c.avg) : '–'}</td><td>${c.t180}</td>` };
   return `<div class="table-wrap"><table class="table">
-    <thead><tr><th>Gracz</th><th>M</th><th>W</th><th>%</th><th>Śr.</th><th>180</th></tr></thead>
+    <thead><tr><th>Gracz</th><th>M</th><th>W</th><th>%</th>${extra.head}</tr></thead>
     <tbody>${rows
       .map(
         ({ p, c }, i) =>
-          `<tr><td><span class="row"><span class="rank-pos" style="width:20px;font-size:18px;${i === 0 ? 'color:var(--brass)' : ''}">${i + 1}</span>${avatar(p, 'av-sm')}<span>${esc(p.name)}</span></span></td><td>${c.matches}</td><td>${c.wins}</td><td>${c.winRate}</td><td>${c.darts ? fmt.f1(c.avg) : '–'}</td><td>${c.t180}</td></tr>`,
+          `<tr><td><span class="row"><span class="rank-pos" style="width:20px;font-size:18px;${i === 0 ? 'color:var(--brass)' : ''}">${i + 1}</span>${avatar(p, 'av-sm')}<span>${esc(p.name)}</span></span></td><td>${c.matches}</td><td>${c.wins}</td><td>${c.winRate}</td>${extra.cells(c)}</tr>`,
       )
       .join('')}</tbody>
   </table></div>
-  <p class="hint">Kolejność: liczba wygranych, potem procent wygranych. Średnia liczona z meczów X01.</p>`;
+  <p class="hint">${cue ? 'Kolejność: wygrane mecze, potem procent wygranych. Brejk to najwyższy brejk w snookerze.' : 'Kolejność: liczba wygranych, potem procent wygranych. Średnia liczona z meczów X01.'}</p>`;
 }
 
 export function historyView() {
   const tab = S.ui.historyTab;
-  const list = S.history.length
-    ? `<div class="stack">${S.history.slice(0, 120).map(matchCard).join('')}</div>${S.history.length > 120 ? `<p class="hint">Pokazano 120 najnowszych z ${S.history.length} meczów.</p>` : ''}`
+  const history = inCategory();
+  const list = history.length
+    ? `<div class="stack">${history.slice(0, 120).map(matchCard).join('')}</div>${history.length > 120 ? `<p class="hint">Pokazano 120 najnowszych z ${history.length} meczów.</p>` : ''}`
     : `<div class="empty"><div class="display">Bez meczów</div><p>Każdy ukończony mecz trafi tutaj razem ze statystykami.</p><button class="btn btn-primary" data-act="new-game">Zagraj</button></div>`;
   return `<div class="screen">
     <div class="page-head"><h1 class="page-title">Wyniki</h1></div>
     <div class="scroll">
+      ${categorySwitch(S.settings.category)}
+      <div style="height:10px"></div>
       ${seg('history-tab', [['matches', 'Mecze'], ['ranking', 'Ranking']], tab)}
       <div style="height:14px"></div>
       ${tab === 'ranking' ? ranking() : list}
@@ -68,7 +79,7 @@ export function historySheet(sheet) {
   const body = labels
     .map((label, r) => `<tr><td>${label}</td>${h.players.map((p) => `<td>${h.stats?.[p.id] ? statRows(h.mode, h.stats[p.id])[r][1] : '–'}</td>`).join('')}</tr>`)
     .join('');
-  const legs = `<tr><td>Wygrane legi</td>${h.players.map((_, i) => `<td>${h.legs?.[i] ?? '–'}</td>`).join('')}</tr>`;
+  const legs = `<tr><td>Wygrane ${categoryOf(h.mode) === 'bilard' ? 'partie' : 'legi'}</td>${h.players.map((_, i) => `<td>${h.legs?.[i] ?? '–'}</td>`).join('')}</tr>`;
   return sheetFrame(
     'Mecz',
     `<div class="row">${avatar(w, 'av-lg')}<div class="grow"><div class="eyebrow" style="color:var(--brass)">Zwycięzca</div><div class="display" style="font-size:40px;text-transform:uppercase">${esc(w?.name || '')}</div></div></div>

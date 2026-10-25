@@ -1,7 +1,8 @@
 import { S, onRender, render, go, closeSheet } from './state.js';
 import { morph } from './dom.js';
 import { unlock } from './audio.js';
-import { drawBoard, confetti } from './fx.js';
+import { drawBoard, drawRack, confetti } from './fx.js';
+import { categoryOf } from './engine/registry.js';
 import { esc } from './util.js';
 import { sheetFrame } from './views/common.js';
 import { homeView, homeActions } from './views/home.js';
@@ -82,8 +83,16 @@ function toastView() {
   return t ? `<div class="toast ${t.kind}" role="status" data-key="${t.id}">${esc(t.text)}</div>` : '';
 }
 
+// The lamp-light glow behind every screen: brass for darts, baize green for billiards.
+function ambientView() {
+  const s = S.ui.screen;
+  const cat =
+    s === 'game' && S.session ? categoryOf(S.session.mode) : s === 'setup' && S.ui.setup ? S.ui.setup.category : S.settings.category;
+  return `<div class="ambient" data-cat="${cat}" aria-hidden="true"></div>`;
+}
+
 function renderApp() {
-  morph(app, screenView() + sheetView() + toastView());
+  morph(app, ambientView() + screenView() + sheetView() + toastView());
   afterRender();
 }
 
@@ -91,11 +100,17 @@ let boardFontsReady = false;
 let lastActive = null;
 
 function afterRender() {
-  const hero = document.getElementById('hero-board');
-  if (hero && (!hero._drawn || hero._drawnWithFonts !== boardFontsReady)) {
-    drawBoard(hero);
-    hero._drawn = true;
-    hero._drawnWithFonts = boardFontsReady;
+  const dart = document.getElementById('hero-dart');
+  if (dart && (!dart._drawn || dart._drawnWithFonts !== boardFontsReady)) {
+    drawBoard(dart);
+    dart._drawn = true;
+    dart._drawnWithFonts = boardFontsReady;
+  }
+  const cue = document.getElementById('hero-cue');
+  if (cue && (!cue._drawn || cue._drawnWithFonts !== boardFontsReady)) {
+    drawRack(cue);
+    cue._drawn = true;
+    cue._drawnWithFonts = boardFontsReady;
   }
   const active = document.querySelector('.scoreboard .on');
   if (active && active.dataset.key !== lastActive) {

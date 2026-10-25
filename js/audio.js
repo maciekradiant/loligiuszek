@@ -60,6 +60,27 @@ export function thud(strength = 1) {
   src.start(t);
 }
 
+// Two balls kissing: a short bright click with a quick decay.
+export function clack() {
+  const ac = audio();
+  if (!ac) return;
+  const t = ac.currentTime;
+  for (const [freq, at] of [
+    [2400, 0],
+    [1800, 0.012],
+  ]) {
+    const osc = ac.createOscillator();
+    const gain = ac.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq, t + at);
+    gain.gain.setValueAtTime(0.25, t + at);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + at + 0.06);
+    osc.connect(gain).connect(ac.destination);
+    osc.start(t + at);
+    osc.stop(t + at + 0.08);
+  }
+}
+
 function tone(freq, start, dur, type = 'triangle', vol = 0.18) {
   const ac = audio();
   if (!ac) return;

@@ -1,8 +1,8 @@
 import { S, render, persist, go, toast, ask, addPlayer, playerById } from '../state.js';
-import { ENGINES, MODE_IDS } from '../engine/modes.js';
+import { ENGINES, CATEGORIES, categoryOf, isCue } from '../engine/registry.js';
 import { buildKnockout } from '../engine/tournament.js';
 import { createSession } from '../session.js';
-import { MODE_INFO, RULE_FIELDS, RULE_HINTS, describe } from '../modes-ui.js';
+import { MODE_INFO, RULE_FIELDS, RULE_HINTS, CATEGORY_INFO, describe } from '../modes-ui.js';
 import { esc, shuffle, nf, plural, clamp } from '../util.js';
 import { flip } from '../dom.js';
 import { icon, avatar, seg, stepper } from './common.js';
@@ -10,11 +10,14 @@ import { formatLabel } from './game.js';
 
 const MAX_BOARDS = 4;
 
-export function newSetup(mode) {
-  const last = S.lastSetup || {};
-  const rules = Object.fromEntries(MODE_IDS.map((id) => [id, { ...ENGINES[id].defaults, ...(last.rules?.[id] || {}) }]));
+export function newSetup(mode, cat) {
+  const category = mode ? categoryOf(mode) : cat || S.settings.category || 'dart';
+  const last = S.lastSetup[category] || {};
+  const ids = CATEGORIES[category];
+  const rules = Object.fromEntries(ids.map((id) => [id, { ...ENGINES[id].defaults, ...(last.rules?.[id] || {}) }]));
   const su = {
-    mode: mode || last.mode || 'x01',
+    category,
+    mode: mode || (ids.includes(last.mode) ? last.mode : ids[0]),
     rules,
     format: last.format || 'single',
     boards: last.boards || 1,
@@ -47,25 +50,34 @@ function normalize(su) {
 }
 
 const groups = (su) => Array.from({ length: su.boards }, (_, b) => su.selected.filter((id) => su.assign[id] === b));
+const cat = (su) => CATEGORY_INFO[su.category];
 
 function problem(su) {
   const eng = ENGINES[su.mode];
   const n = su.selected.length;
+  const where = su.category === 'bilard' ? 'stole' : 'tarczy';
   if (!n) return 'Wybierz graczy, którzy grają.';
   if (su.format === 'single') {
-    if (su.boards > n) return `Na ${su.boards} tarcze potrzeba co najmniej ${su.boards} graczy.`;
+    if (su.boards > n) return `Na ${nf(su.boards, ...boardForms(su))} potrzeba co najmniej ${su.boards} graczy.`;
     const g = groups(su);
-    if (g.some((x) => x.length < eng.minPlayers)) return `${MODE_INFO[su.mode].name}: co najmniej ${eng.minPlayers} graczy na każdej tarczy.`;
+    if (eng.maxPlayers && g.some((x) => x.length !== eng.maxPlayers)) {
+      return su.boards === 1 && n > 2
+        ? `${MODE_INFO[su.mode].name}: przy stole grają 2 osoby. Dodaj stoły albo wybierz puchar lub ligę.`
+        : `${MODE_INFO[su.mode].name}: dokładnie 2 graczy na każdym stole.`;
+    }
+    if (g.some((x) => x.length < eng.minPlayers)) return `${MODE_INFO[su.mode].name}: co najmniej ${eng.minPlayers} graczy na każdej ${where}.`;
     return null;
   }
   if (n < 3) return 'Turniej wymaga co najmniej 3 graczy.';
   return null;
 }
 
+const boardForms = (su) => (su.category === 'bilard' ? ['stół', 'stoły', 'stołów'] : ['tarcza', 'tarcze', 'tarcz']);
+
 function summary(su) {
   const n = su.selected.length;
   const parts = [describe(su.mode, su.rules[su.mode]), nf(n, 'gracz', 'graczy', 'graczy')];
-  if (su.boards > 1) parts.push(nf(su.boards, 'tarcza', 'tarcze', 'tarcz'));
+  if (su.boards > 1) parts.push(nf(su.boards, ...boardForms(su)));
   if (su.format === 'knockout') parts.push('puchar');
   if (su.format === 'league') parts.push('liga');
   return parts.join(' · ');
@@ -80,7 +92,7 @@ export function setupView() {
   return `<div class="screen">
     <header class="bar-head">
       <button class="icon-btn" data-act="go" data-to="home" aria-label="Wróć">${icon.back}</button>
-      <div class="bar-title"><strong>Nowa gra</strong></div>
+      <div class="bar-title"><strong>Nowa gra</strong><span>${cat(su).label}</span></div>
       <span></span>
     </header>
     <div class="scroll">
@@ -98,12 +110,13 @@ export function setupView() {
 }
 
 function modeSection(su) {
-  const buttons = MODE_IDS.map(
+  const ids = CATEGORIES[su.category];
+  const buttons = ids.map(
     (id) => `<button data-act="su-mode" data-v="${id}" aria-pressed="${su.mode === id}"><b>${MODE_INFO[id].pick}</b>${MODE_INFO[id].name}</button>`,
   ).join('');
   return `<section class="section" style="padding-top:8px">
     <h2 class="section-title">Gra</h2>
-    <div class="mode-pick">${buttons}</div>
+    <div class="mode-pick" style="grid-template-columns:repeat(${ids.length},1fr)">${buttons}</div>
     <p class="hint">${MODE_INFO[su.mode].desc}</p>
   </section>`;
 }
@@ -115,14 +128,17 @@ function rulesSection(su, rules) {
   const hint = RULE_HINTS[su.mode]?.(rules);
   const legs = rules.legs || 1;
   const sets = rules.sets || 1;
+  const length = isCue(su.mode)
+    ? `<div class="rule"><span class="rule-label">Partie do wygrania</span>${stepper('su-legs', legs, 1, 15, nf(legs, 'partia', 'partie', 'partii'))}</div>`
+    : `<div class="rule"><span class="rule-label">Legi do wygrania${sets > 1 ? ' w secie' : ''}</span>${stepper('su-legs', legs, 1, 11, nf(legs, 'leg', 'legi', 'legów'))}</div>
+      <div class="rule"><span class="rule-label">Sety</span>${stepper('su-sets', sets, 1, 7, sets === 1 ? 'bez setów' : `do ${sets} wygranych`)}</div>`;
   return `<section class="section">
     <h2 class="section-title">Zasady</h2>
     <div class="rules">
       ${fields}
       ${hint ? `<p class="hint">${hint}</p>` : ''}
-      <div class="rule"><span class="rule-label">Legi do wygrania${sets > 1 ? ' w secie' : ''}</span>${stepper('su-legs', legs, 1, 11, nf(legs, 'leg', 'legi', 'legów'))}</div>
-      <div class="rule"><span class="rule-label">Sety</span>${stepper('su-sets', sets, 1, 7, sets === 1 ? 'bez setów' : `do ${sets} wygranych`)}</div>
-      <p class="hint">Mecz: ${formatLabel(rules)}.</p>
+      ${length}
+      <p class="hint">Mecz: ${formatLabel(rules, su.mode)}.</p>
     </div>
   </section>`;
 }
@@ -147,17 +163,24 @@ function playersSection(su) {
 function boardsSection(su) {
   const n = su.selected.length;
   const fmt = seg('su-format', [['single', 'Jedna gra'], ['knockout', 'Puchar'], ['league', 'Liga']], su.format);
-  const boards = seg('su-boards', [1, 2, 3, 4].map((b) => [b, `${b} ${plural(b, 'tarcza', 'tarcze', 'tarcz')}`]), su.boards);
+  const cue = su.category === 'bilard';
+  const forms = boardForms(su);
+  const boards = seg('su-boards', [1, 2, 3, 4].map((b) => [b, `${b} ${plural(b, ...forms)}`]), su.boards);
+  const parallel = su.boards > 1 ? `Mecze rozgrywane równolegle na ${su.boards} ${cue ? 'stołach' : 'tarczach'}.` : '';
   let hint;
   if (su.format === 'single') {
-    hint =
-      su.boards === 1
-        ? 'Wszyscy grają na jednej tarczy, po kolei.'
-        : `Gracze dzielą się na ${su.boards} tarcze i każda tarcza gra własny mecz. Przełączasz się między nimi zakładkami.`;
+    if (cue) {
+      hint = su.boards === 1 ? 'Przy stole grają dwie osoby.' : `Pary rozchodzą się na ${nf(su.boards, ...forms)}, każdy stół gra własny mecz. Przełączasz się zakładkami.`;
+    } else {
+      hint =
+        su.boards === 1
+          ? 'Wszyscy grają na jednej tarczy, po kolei.'
+          : `Gracze dzielą się na ${su.boards} tarcze i każda tarcza gra własny mecz. Przełączasz się między nimi zakładkami.`;
+    }
   } else if (su.format === 'knockout') {
-    hint = `Puchar: przegrany odpada, wygrany idzie dalej aż do finału. ${su.boards > 1 ? `Mecze rozgrywane równolegle na ${su.boards} tarczach.` : ''}`;
+    hint = `Puchar: przegrany odpada, wygrany idzie dalej aż do finału. ${parallel}`;
   } else {
-    hint = `Liga: każdy gra z każdym${n >= 3 ? ` (${nf((n * (n - 1)) / 2, 'mecz', 'mecze', 'meczów')})` : ''}, za wygraną 2 punkty. ${su.boards > 1 ? `Mecze rozgrywane równolegle na ${su.boards} tarczach.` : ''}`;
+    hint = `Liga: każdy gra z każdym${n >= 3 ? ` (${nf((n * (n - 1)) / 2, 'mecz', 'mecze', 'meczów')})` : ''}, za wygraną 2 punkty. ${parallel}`;
   }
   return `<section class="section">
     <h2 class="section-title">Rozgrywki</h2>
@@ -170,8 +193,8 @@ function boardsSection(su) {
 function orderItem(id, pos, b, su) {
   const p = playerById(id);
   if (!p) return '';
-  const move = su.format === 'single' && su.boards > 1 ? `<button class="move-btn" data-act="su-move" data-id="${id}">T${((b + 1) % su.boards) + 1} →</button>` : '';
-  const starts = pos === 0 && su.format === 'single' ? '<small>zaczyna</small>' : '';
+  const move = su.format === 'single' && su.boards > 1 ? `<button class="move-btn" data-act="su-move" data-id="${id}">${cat(su).boardShort}${((b + 1) % su.boards) + 1} →</button>` : '';
+  const starts = pos === 0 && su.format === 'single' ? `<small>${su.category === 'bilard' ? 'rozbija' : 'zaczyna'}</small>` : '';
   return `<li class="order-item" data-key="${id}">
     <span class="order-pos">${pos + 1}</span>${avatar(p)}
     <span class="order-name">${esc(p.name)}${starts}</span>
@@ -187,17 +210,17 @@ function orderSection(su) {
     const cards = g
       .map(
         (ids, b) => `<div class="board-card">
-        ${su.boards > 1 ? `<div class="board-card-head"><b>Tarcza ${b + 1}</b><span class="faint">${nf(ids.length, 'gracz', 'graczy', 'graczy')}</span></div>` : ''}
+        ${su.boards > 1 ? `<div class="board-card-head"><b>${cat(su).board} ${b + 1}</b><span class="faint">${nf(ids.length, 'gracz', 'graczy', 'graczy')}</span></div>` : ''}
         <ol class="order-list" data-group="${b}">${ids.map((id, i) => orderItem(id, i, b, su)).join('') || '<li class="hint" style="padding:10px">Brak graczy</li>'}</ol>
       </div>`,
       )
       .join('');
     return `<section class="section">
-      <div class="section-head"><h2 class="section-title">Kolejność</h2></div>
-      <p class="hint">Przeciągnij za uchwyt albo wylosuj. W kolejnych legach zaczyna następny gracz.</p>
+      <div class="section-head"><h2 class="section-title">${su.category === 'bilard' ? 'Kto rozbija' : 'Kolejność'}</h2></div>
+      <p class="hint">${su.category === 'bilard' ? 'Pierwszy na liście rozbija pierwszą partię. Przeciągnij albo wylosuj.' : 'Przeciągnij za uchwyt albo wylosuj. W kolejnych legach zaczyna następny gracz.'}</p>
       <div class="row" style="flex-wrap:wrap">
-        <button class="btn btn-sm btn-line" data-act="su-shuffle">${icon.shuffle}Losuj kolejność</button>
-        ${su.boards > 1 ? `<button class="btn btn-sm btn-line" data-act="su-shuffle-boards">${icon.shuffle}Losuj tarcze</button>` : ''}
+        <button class="btn btn-sm btn-line" data-act="su-shuffle">${icon.shuffle}${su.category === 'bilard' ? 'Losuj, kto rozbija' : 'Losuj kolejność'}</button>
+        ${su.boards > 1 ? `<button class="btn btn-sm btn-line" data-act="su-shuffle-boards">${icon.shuffle}Losuj ${su.category === 'bilard' ? 'stoły' : 'tarcze'}</button>` : ''}
       </div>
       <div id="order-root">${cards}</div>
     </section>`;
@@ -277,7 +300,7 @@ export const setupActions = {
   },
   'su-legs': (el) => {
     const r = su().rules[su().mode];
-    r.legs = clamp((r.legs || 1) + +el.dataset.d, 1, 11);
+    r.legs = clamp((r.legs || 1) + +el.dataset.d, 1, isCue(su().mode) ? 15 : 11);
     render();
   },
   'su-sets': (el) => {
@@ -312,6 +335,7 @@ export const setupActions = {
   },
   'su-boards': (el) => {
     su().boards = +el.dataset.v;
+    su().assign = {};
     normalize(su());
     render();
   },
@@ -353,12 +377,12 @@ export const setupActions = {
       order: s.selected,
       roster: S.players,
     });
-    S.lastSetup = { mode: s.mode, rules: s.rules, format: s.format, boards: s.boards, selected: s.selected, assign: s.assign };
+    S.lastSetup[s.category] = { mode: s.mode, rules: s.rules, format: s.format, boards: s.boards, selected: s.selected, assign: s.assign };
     S.ui.board = 0;
     S.ui.entry = '';
     S.ui.mult = 1;
     persist('session', 'lastSetup');
-    if (boards < s.boards) toast(`Wystarczą ${nf(boards, 'tarcza', 'tarcze', 'tarcz')} dla ${s.selected.length} graczy.`);
+    if (boards < s.boards) toast(`Wystarczą ${nf(boards, ...boardForms(s))} dla ${s.selected.length} graczy.`);
     go('game');
   },
 };
