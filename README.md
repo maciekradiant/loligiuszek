@@ -42,10 +42,11 @@ Lotka liczy punkty w darcie i w bilardzie, losuje kolejność, rozdziela graczy 
 
 ## Instalacja na iPhonie
 
-1. W repozytorium na GitHubie otwórz **Settings → Pages**.
-2. W **Build and deployment** wybierz **Deploy from a branch**, gałąź `main` (albo `claude/dart-scoring-app-73a7fw`, jeśli chcesz przed scaleniem) i folder **/ (root)**, potem **Save**.
-3. Po minucie aplikacja będzie pod adresem **https://maciekradiant.github.io/loligiuszek/**.
-4. Otwórz ten adres w **Safari** na iPhonie, stuknij **Udostępnij** i wybierz **Do ekranu początkowego**.
+1. Repozytorium nazywa się `lotka` (Settings → General → Repository name), dzięki czemu adres aplikacji kończy się na `/lotka/`.
+2. W repozytorium na GitHubie otwórz **Settings → Pages**.
+3. W **Build and deployment** wybierz **Deploy from a branch**, gałąź `main` (albo `claude/dart-scoring-app-73a7fw`, jeśli chcesz przed scaleniem) i folder **/ (root)**, potem **Save**.
+4. Po minucie aplikacja będzie pod adresem **https://maciekradiant.github.io/lotka/**.
+5. Otwórz ten adres w **Safari** na iPhonie, stuknij **Udostępnij** i wybierz **Do ekranu początkowego**.
 
 Od tej chwili Lotka uruchamia się z ikony i działa bez internetu. Gracze i wyniki są zapisane tylko na tym telefonie.
 
