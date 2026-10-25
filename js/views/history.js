@@ -6,13 +6,15 @@ import { categoryOf } from '../engine/registry.js';
 
 const inCategory = () => S.history.filter((h) => categoryOf(h.mode) === S.settings.category);
 
+const isWinner = (h, id) => (h.winnerIds ? h.winnerIds.includes(id) : h.winnerId === id);
+
 function matchCard(h) {
   const two = h.players.length === 2;
   const useSets = (h.rules?.sets || 1) > 1;
   const showScore = (h.rules?.legs || 1) > 1 || useSets;
   const rows = h.players
     .map((p, i) => {
-      const win = p.id === h.winnerId;
+      const win = isWinner(h, p.id);
       const val = useSets ? h.sets?.[i] : h.legs?.[i];
       const s = h.stats?.[p.id];
       const extra = h.mode === 'x01' && s?.darts ? `śr. ${fmt.f1((s.points / s.darts) * 3)}` : '';
@@ -72,7 +74,9 @@ export function historySheet(sheet) {
   if (sheet.type !== 'history-detail') return '';
   const h = S.history.find((x) => x.id === sheet.id);
   if (!h) return '';
-  const w = h.players.find((p) => p.id === h.winnerId);
+  const winners = h.players.filter((p) => isWinner(h, p.id));
+  const w = winners[0];
+  const title = h.winnerLabel || winners.map((p) => p.name).join(', ');
   const first = h.stats?.[h.players[0].id];
   const labels = first ? statRows(h.mode, first).map((r) => r[0]) : [];
   const cols = h.players.map((p) => `<th>${esc(p.name.split(' ')[0])}</th>`).join('');
@@ -82,7 +86,7 @@ export function historySheet(sheet) {
   const legs = `<tr><td>Wygrane ${categoryOf(h.mode) === 'bilard' ? 'partie' : 'legi'}</td>${h.players.map((_, i) => `<td>${h.legs?.[i] ?? '–'}</td>`).join('')}</tr>`;
   return sheetFrame(
     'Mecz',
-    `<div class="row">${avatar(w, 'av-lg')}<div class="grow"><div class="eyebrow" style="color:var(--brass)">Zwycięzca</div><div class="display" style="font-size:40px;text-transform:uppercase">${esc(w?.name || '')}</div></div></div>
+    `<div class="row">${avatar(w, 'av-lg')}<div class="grow"><div class="eyebrow" style="color:var(--brass)">${winners.length > 1 ? 'Zwycięzcy' : 'Zwycięzca'}</div><div class="display" style="font-size:40px;text-transform:uppercase">${esc(title)}</div>${h.winnerLabel ? `<div class="faint">${esc(winners.map((p) => p.name).join(', '))}</div>` : ''}</div></div>
     <p class="hint">${esc(h.label)}${h.context ? ` · ${esc(h.context)}` : ''}<br>${timeAgo(h.ts)}${h.started ? ` · ${duration(h.ts - h.started)}` : ''} · ${nf(h.players.length, 'gracz', 'graczy', 'graczy')}</p>
     <div class="table-wrap"><table class="table"><thead><tr><th>Statystyka</th>${cols}</tr></thead><tbody>${legs}${body}</tbody></table></div>
     <button class="btn btn-line btn-danger" data-act="history-delete" data-id="${h.id}">${icon.trash}Usuń z historii</button>`,

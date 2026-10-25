@@ -1,6 +1,6 @@
 // Screens for the cue sports: scoreboards, the rack of tappable balls and the snooker pad.
 
-import { snookerOn, snookerRemaining } from '../engine/cue.js';
+import { snookerOn, snookerRemaining, groupName } from '../engine/cue.js';
 import { esc, nf } from '../util.js';
 import { icon, avatar, colorVar, sheetFrame, pips } from './common.js';
 
@@ -83,7 +83,43 @@ function snookerBoard(m, R) {
     <div class="table-info"><span>Na stole <b>${rem}</b></span><span>Różnica <b>${diff}</b></span><span>${phase}</span>${needs}</div>`;
 }
 
+// Bieda wersja: the two groups at the table, who is shooting, and who waits in the queue.
+function biedaBoard(m, R) {
+  const st = R.leg.st;
+  const t = R.leg.turn;
+  const cards = [0, 1]
+    .map((side) => {
+      const g = R.leg.sides[side];
+      const on = t.side === side;
+      const fouls = R.leg.fouls[side];
+      const left =
+        R.rules.game === 'pool8'
+          ? groupLabel(st, side)
+          : `<span class="${fouls >= 2 && R.rules.threeFoul ? 'warn' : ''}">${fouls ? `${nf(fouls, 'faul', 'faule', 'fauli')} z rzędu` : 'Bez fauli'}</span>`;
+      const members = R.groups[g]
+        .map((i) => `<span class="${on && i === t.p ? 'shooter' : ''}">${esc(firstName(m.players[i].name))}</span>`)
+        .join('');
+      return `<div class="pc pc-group ${on ? 'on' : ''}" data-key="grp${g}">
+        <div class="pc-top"><span class="pc-name">${esc(groupName(R.rules, g))}</span>${pips(R.groupWins[g], R.rules.legs)}</div>
+        <div class="members">${members}</div>
+        <div class="pc-score">${R.groupWins[g]}</div>
+        <div class="pc-meta">${left}${R.leg.breakSide === side ? '<span>rozbija</span>' : ''}</div>
+      </div>`;
+    })
+    .join('');
+  const queue = R.queue.length
+    ? `<div class="queue"><span class="eyebrow">Kolejka do stołu</span>${R.queue
+        .map(
+          (g, i) =>
+            `<span class="queue-chip"><i>${i + 1}</i><b>${esc(groupName(R.rules, g))}</b><small>${R.groups[g].map((p) => esc(firstName(m.players[p].name))).join(', ')} · ${R.groupWins[g]} wygr.</small></span>`,
+        )
+        .join('')}</div>`
+    : '';
+  return `<div class="duel">${cards}</div>${queue}`;
+}
+
 export function cueScoreboard(m, R) {
+  if (m.mode === 'bieda') return biedaBoard(m, R);
   return m.mode === 'snooker' ? snookerBoard(m, R) : poolBoard(m, R);
 }
 
@@ -96,7 +132,7 @@ export function cueTurnStrip(m, R) {
     ? t.balls.map((v) => snookerBall(v, 'mini')).join('')
     : t.balls.map((n) => ball(n, 'mini')).join('');
   return `<div class="turn">
-    <div class="cue-visit"><span class="eyebrow">Przy stole</span><b>${esc(m.players[t.p].name)}</b></div>
+    <div class="cue-visit"><span class="eyebrow">${m.mode === 'bieda' ? esc(groupName(R.rules, R.leg.sides[t.side])) : 'Przy stole'}</span><b>${esc(m.players[t.p].name)}</b></div>
     <div class="mini-balls">${potted}</div>
     <div class="turn-sum"><small>${sn ? 'Brejk' : 'Seria'}</small>${sn ? t.pts : t.balls.length}</div>
     <button class="icon-btn" data-act="undo" aria-label="Cofnij ostatnie zagranie" ${m.events.length ? '' : 'disabled'}>${icon.undo}</button>
@@ -113,10 +149,11 @@ const endRow = (foulAct = 'cue-foul') => `<div class="pad-row" style="grid-templ
 
 function poolPad(m, R) {
   const st = R.leg.st;
-  const p = R.leg.cur;
-  const all = m.mode === 'pool8' ? Array.from({ length: 15 }, (_, i) => i + 1) : Array.from({ length: 9 }, (_, i) => i + 1);
-  const target = m.mode === 'pool9' ? Math.min(...st.on) : null;
-  const mine = m.mode === 'pool8' && st.groups ? st.groups[p] : null;
+  const game = m.mode === 'bieda' ? R.rules.game : m.mode;
+  const p = m.mode === 'bieda' ? R.leg.turn.side : R.leg.cur;
+  const all = game === 'pool8' ? Array.from({ length: 15 }, (_, i) => i + 1) : Array.from({ length: 9 }, (_, i) => i + 1);
+  const target = game === 'pool9' ? Math.min(...st.on) : null;
+  const mine = game === 'pool8' && st.groups ? st.groups[p] : null;
   const groupDone = mine && !st.on.some((b) => (mine === 'solids' ? b < 8 : b > 8));
   const keys = all
     .map((n) => {
@@ -127,7 +164,7 @@ function poolPad(m, R) {
     })
     .join('');
   return `<div class="pad">
-    <div class="rack ${m.mode}">${keys}</div>
+    <div class="rack ${game}">${keys}</div>
     ${endRow('cue-foul')}
   </div>`;
 }
@@ -154,6 +191,22 @@ export function cuePad(m, R) {
 
 export function cueSheet(sheet, m, R) {
   if (!m || !R) return '';
+  if (sheet.type === 'cue-frame' && m.mode === 'bieda') {
+    const side = R.leg.turn.side;
+    const label = (sd) => esc(groupName(R.rules, R.leg.sides[sd]));
+    const intro =
+      sheet.reason === '8'
+        ? `<p class="hint">Ósemka w łuzie. Wbita legalnie: partia dla grupy ${label(side)}. Za wcześnie albo z faulem: partia dla rywali.</p>`
+        : '<p class="hint">Która grupa wygrała tę partię?</p>';
+    const order = sheet.reason === '8' ? [side, 1 - side] : [0, 1];
+    const buttons = order
+      .map((sd) => {
+        const names = R.groups[R.leg.sides[sd]].map((i) => esc(firstName(m.players[i].name))).join(', ');
+        return `<button class="btn btn-primary winner-pick group-pick" data-act="cue-frame" data-p="${sd}"><span><b>${label(sd)}</b><small>${names}</small></span></button>`;
+      })
+      .join('');
+    return sheetFrame('Kto wygrał partię?', `${intro}<div class="stack">${buttons}</div>`);
+  }
   if (sheet.type === 'cue-frame') {
     const shooter = R.leg.cur;
     const intro =

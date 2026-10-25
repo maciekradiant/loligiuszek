@@ -4,7 +4,7 @@ import { say } from '../audio.js';
 import { icon, tabbar, switchRow, seg, sheetFrame } from './common.js';
 import { esc } from '../util.js';
 
-export const APP_VERSION = '1.1.1';
+export const APP_VERSION = '1.2.0';
 
 const standalone = () => window.matchMedia?.('(display-mode: standalone)').matches || window.navigator.standalone === true;
 

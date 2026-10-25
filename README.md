@@ -15,6 +15,7 @@ Lotka liczy punkty w darcie i w bilardzie, losuje kolejność, rozdziela graczy 
 - **Ósemka**: bile do stukania, grupy (pełne/połówki) przypisują się same po rozbiciu, przy ósemce pytanie, kto wygrał partię.
 - **Dziewiątka**: podświetlona najniższa bila na stole, wbicie dziewiątki kończy partię, zasada trzech fauli z rzędu.
 - **Snooker**: 15, 10 albo 6 czerwonych. Punkty, aktualny brejk, punkty na stole, różnica, „potrzebne snookery”, faule 4–7, remis na czarnej.
+- **Bieda wersja**: gra dla więcej niż dwóch osób na jednym stole. Aplikacja losuje grupy (po 1, 2 albo 3 osoby), w grupie gracie na zmianę, a przy trzech i więcej grupach wygrani zostają przy stole, przegrani idą na koniec kolejki. Do wyboru ósemka albo dziewiątka.
 - Gra do ustalonej liczby wygranych partii, rozbicie na zmianę albo przez zwycięzcę, statystyki: break & run, najdłuższa seria, najwyższy brejk.
 
 **Gracze, kolejność i tarcze**

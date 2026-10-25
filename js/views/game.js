@@ -11,6 +11,7 @@ import { icon, avatar, colorVar, pips, markSvg, sheetFrame } from './common.js';
 import { describe, categoryInfo } from '../modes-ui.js';
 import { isCue } from '../engine/registry.js';
 import { cueScoreboard, cueTurnStrip, cuePad, cueSheet, isCueSheet } from './cue.js';
+import { groupName, winnerIndices, drawGroups } from '../engine/cue.js';
 
 const firstName = (name) => String(name).split(' ')[0];
 const boardIdx = () => clamp(S.ui.board, 0, S.session.boards.length - 1);
@@ -436,7 +437,38 @@ function statsTable(m, R) {
   return `<div class="table-wrap"><table class="table"><thead><tr><th>Statystyka</th>${cols}</tr></thead><tbody>${legs}${rows.join('')}</tbody></table></div>`;
 }
 
+function biedaResult(m, R) {
+  const g = R.winner;
+  const members = R.groups[g].map((i) => m.players[i]);
+  const order = R.groups.map((_, i) => i).sort((a, b) => (b === g) - (a === g) || R.groupWins[b] - R.groupWins[a]);
+  const table = `<div class="list-card">${order
+    .map(
+      (i, pos) =>
+        `<div class="list-row ${pos === 0 ? 'rank-1' : ''}"><span class="rank-pos">${pos + 1}</span><span class="grow"><b>${esc(groupName(R.rules, i))}</b><small>${R.groups[i]
+          .map((p) => esc(m.players[p].name))
+          .join(', ')}</small></span><span class="display" style="font-size:28px">${R.groupWins[i]}</span></div>`,
+    )
+    .join('')}</div>`;
+  return `<div class="result">
+    <div class="winner">
+      <span class="eyebrow">Zwycięska grupa</span>
+      <div class="row" style="justify-content:center">${members.map((p) => avatar(p, 'av-lg')).join('')}</div>
+      <div class="winner-name">${esc(groupName(R.rules, g))}</div>
+      <p class="muted" style="margin:0">${members.map((p) => esc(p.name)).join(', ')}</p>
+    </div>
+    ${table}
+    ${statsTable(m, R)}
+    <div class="actions">
+      <button class="btn btn-primary" data-act="rematch">Rewanż, te same grupy</button>
+      <button class="btn" data-act="bieda-redraw">${icon.shuffle} Nowe grupy</button>
+      <button class="btn" data-act="undo">${icon.undo} Cofnij rzut</button>
+      <button class="btn" data-act="end-session" style="grid-column:1 / -1">Zakończ grę</button>
+    </div>
+  </div>`;
+}
+
 function resultView(ses, m, R) {
+  if (m.mode === 'bieda') return biedaResult(m, R);
   const w = m.players[R.winner];
   const n = m.players.length;
   const useSets = R.rules.sets > 1;
@@ -597,6 +629,29 @@ function cueFeedback(m, R, ev, before) {
     if (m.mode === 'pool9' && R.rules.threeFoul && last.type === 'foul' && R.leg.fouls[p] === 2) {
       toast(`${name(p)}: dwa faule z rzędu. Trzeci oznacza przegraną partię.`, 'warn');
     }
+    if (m.mode === 'bieda' && R.rules.game === 'pool9' && R.rules.threeFoul && last.type === 'foul' && R.leg.fouls[last.side] === 2) {
+      toast(`${groupName(R.rules, R.leg.sides[last.side])}: dwa faule z rzędu. Trzeci oznacza przegraną partię.`, 'warn');
+    }
+  }
+  if (m.mode === 'bieda' && (last.type === 'leg' || last.type === 'match')) {
+    if (last.threeFoul) flash('3 faule', 'bust');
+    else if (last.runOut) flash('Break & run');
+    if (sounds) chime(last.type === 'match' ? 'win' : 'big');
+    const winners = groupName(R.rules, last.group);
+    if (last.type === 'leg') {
+      const comes = last.next !== null ? groupName(R.rules, last.next) : null;
+      const [a, b] = R.leg.sides.map((g) => R.groupWins[g]);
+      overlay({
+        eyebrow: `Partia ${last.leg.no + 1}`,
+        title: winners,
+        sub: comes ? `zostają przy stole · do stołu: ${comes}` : `wygrywają partię · ${a} : ${b}`,
+      });
+      speak(`Partia dla: ${winners}.${comes ? ` Do stołu podchodzą: ${comes}.` : ''}`, { interrupt: false });
+    } else {
+      speak(`Wygrywają ${winners}!`, { interrupt: false });
+      S.ui.confetti = true;
+    }
+    return;
   }
   if (last.type === 'leg' || last.type === 'match') {
     if (last.threeFoul) flash('3 faule', 'bust');
@@ -705,7 +760,9 @@ function finishMatch(m, R) {
     rules: m.rules,
     label: describe(m.mode, m.rules),
     players: m.players.map(({ id, name, color }) => ({ id, name, color })),
-    winnerId: m.players[R.winner].id,
+    winnerId: m.players[winnerIndices(m, R)[0]].id,
+    winnerIds: winnerIndices(m, R).map((i) => m.players[i].id),
+    winnerLabel: m.mode === 'bieda' ? groupName(R.rules, R.winner) : undefined,
     legs: R.stats.map((s) => s.legs),
     sets: R.stats.map((s) => s.sets),
     stats: Object.fromEntries(m.players.map((p, i) => [p.id, R.stats[i]])),
@@ -787,7 +844,8 @@ export const gameActions = {
   'cue-pot': (el) => {
     const b = +el.dataset.b;
     const m = currentMatch();
-    if (m?.mode === 'pool8' && b === 8) return openSheet('cue-frame', { reason: '8' });
+    const eight = m?.mode === 'pool8' || (m?.mode === 'bieda' && m.rules.game === 'pool8');
+    if (eight && b === 8) return openSheet('cue-frame', { reason: '8' });
     push({ k: 'pot', b });
   },
   'cue-miss': () => push({ k: 'miss' }),
@@ -864,6 +922,26 @@ export const gameActions = {
   rematch: () => {
     rematch(S.session, boardIdx());
     persist('session');
+    render();
+  },
+  'bieda-redraw': () => {
+    const ses = S.session;
+    const m = currentMatch();
+    if (!m) return;
+    const sizes = m.rules.groups.map((g) => g.length);
+    const { groups, names } = drawGroups(
+      m.players.map((p) => p.id),
+      Math.max(...sizes),
+    );
+    const order = groups.flat();
+    const at = new Map(order.map((id, i) => [id, i]));
+    ses.rules = { ...ses.rules, groups: groups.map((g) => g.map((id) => at.get(id))), groupNames: names };
+    const byId = new Map(m.players.map((p) => [p.id, p]));
+    const next = rematch(ses, boardIdx());
+    next.players = order.map((id) => byId.get(id));
+    next.rules = { ...ses.rules };
+    persist('session');
+    toast('Nowe grupy wylosowane');
     render();
   },
   'next-match': () => {

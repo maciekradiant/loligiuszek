@@ -74,6 +74,14 @@ export const MODE_INFO = {
     short: 'Bile po kolei, wygrywa dziewiątka.',
     desc: 'Zawsze celujesz w najniższą bilę na stole. Kto wbije dziewiątkę, wygrywa partię. Trzy faule z rzędu przegrywają.',
   },
+  bieda: {
+    name: 'Bieda wersja',
+    glyph: '3+',
+    pick: '3+',
+    joke: true,
+    short: 'Gra dla więcej niż dwóch osób na jednym stole',
+    desc: 'Jeden stół, cała ekipa. Losuję grupy, w grupie gracie na zmianę, a przy trzech i więcej grupach zwycięzcy zostają przy stole, przegrani idą na koniec kolejki.',
+  },
   snooker: {
     name: 'Snooker',
     glyph: '147',
@@ -107,6 +115,10 @@ export const RULE_FIELDS = {
     ['threeFoul', 'Trzy faule z rzędu', [[true, 'Przegrana partia'], [false, 'Bez kary']]],
   ],
   snooker: [['reds', 'Czerwone bile', [[15, '15'], [10, '10'], [6, '6']]]],
+  bieda: [
+    ['game', 'Gra', [['pool8', 'Ósemka'], ['pool9', 'Dziewiątka']]],
+    ['groupSize', 'W grupie', [[1, 'Po 1'], [2, 'Po 2'], [3, 'Po 3']]],
+  ],
 };
 
 export const RULE_HINTS = {
@@ -122,6 +134,7 @@ export const RULE_HINTS = {
         : 'Zamknąć można dowolnym polem.',
   pool8: () => 'Grupy przypisują się same po pierwszej bili wbitej po rozbiciu. Ósemkę wbija się na końcu.',
   pool9: () => 'Wbicie dziewiątki kończy partię. Najniższa bila na stole jest podświetlona.',
+  bieda: () => 'Na wygranego: kto wygra partię, zostaje przy stole. Przegrani ustawiają się na końcu kolejki.',
   snooker: (r) => (r.reds === 15 ? 'Pełny stół: maksymalny brejk to 147.' : `Krótszy snooker z ${r.reds} czerwonymi, dobry na szybki mecz.`),
 };
 

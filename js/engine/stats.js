@@ -22,7 +22,7 @@ export function statRows(mode, s) {
       ['Faule', s.fouls],
     ];
   }
-  if (mode === 'pool8' || mode === 'pool9') {
+  if (mode === 'pool8' || mode === 'pool9' || mode === 'bieda') {
     return [
       ['Break & run', s.breakRuns],
       ['Wbite bile', s.pots],
@@ -83,7 +83,7 @@ export function careerStats(playerId, history) {
     if (!s) continue;
     c.matches++;
     c.byMode[h.mode] = (c.byMode[h.mode] || 0) + 1;
-    if (h.winnerId === playerId) c.wins++;
+    if (h.winnerIds ? h.winnerIds.includes(playerId) : h.winnerId === playerId) c.wins++;
     if (h.mode === 'x01') {
       c.points += s.points;
       c.darts += s.darts;
@@ -103,7 +103,7 @@ export function careerStats(playerId, history) {
       c.crDarts += s.darts;
     }
     c.kills += s.kills || 0;
-    if (h.mode === 'pool8' || h.mode === 'pool9' || h.mode === 'snooker') {
+    if (h.mode === 'pool8' || h.mode === 'pool9' || h.mode === 'snooker' || h.mode === 'bieda') {
       c.frames += s.legs;
       c.pots += s.pots;
       c.breakRuns += s.breakRuns;

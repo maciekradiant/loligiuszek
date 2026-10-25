@@ -133,3 +133,48 @@ test('pool8: groups are picked after the break and the frame is awarded explicit
   assert.equal(R.leg.starter, 1, 'break alternates');
   assert.equal(R.stats[1].pots, 1);
 });
+
+test('bieda: members of a group take turns and the winners stay on', () => {
+  const six = ['a', 'b', 'c', 'd', 'e', 'f'].map((id) => ({ id, name: id.toUpperCase(), color: 'red' }));
+  // groups: [a,b] [c,d] [e,f]
+  const m = createMatch({
+    id: 'm',
+    mode: 'bieda',
+    rules: { game: 'pool9', groupSize: 2, legs: 2, sets: 1, threeFoul: true, groups: [[0, 1], [2, 3], [4, 5]], groupNames: ['X', 'Y', 'Z'] },
+    players: six,
+  });
+  let R = matchState(m);
+  assert.deepEqual(R.leg.sides, [0, 1]);
+  assert.equal(R.leg.cur, 0, 'a breaks');
+  R = pushEvent(m, MISS);
+  assert.equal(R.leg.cur, 2, 'then c from the other group');
+  R = pushEvent(m, MISS);
+  assert.equal(R.leg.cur, 1, 'then b, the second member of the first group');
+  R = pushEvent(m, MISS);
+  assert.equal(R.leg.cur, 3);
+  R = pushEvent(m, pot(9)); // d pots the nine: group 1 wins the frame
+  assert.equal(R.last.type, 'leg');
+  assert.equal(R.last.group, 1);
+  assert.equal(R.last.next, 2, 'group 2 comes to the table');
+  assert.deepEqual(R.leg.sides, [1, 2]);
+  assert.deepEqual(R.queue, [0]);
+  assert.equal(R.leg.breakSide, 1, 'the newcomers break');
+  assert.equal(R.leg.cur, 4);
+  assert.equal(R.stats[2].legs, 1);
+  assert.equal(R.stats[3].legs, 1);
+  R = pushEvent(m, { k: 'frame', p: 0 }); // group 1 wins again -> match
+  assert.equal(R.winner, 1);
+  assert.deepEqual(R.groupWins, [0, 2, 0]);
+});
+
+test('bieda: with two groups the break alternates and 8-ball groups follow the side', () => {
+  const four = ['a', 'b', 'c', 'd'].map((id) => ({ id, name: id, color: 'red' }));
+  const m = createMatch({ id: 'm', mode: 'bieda', rules: { game: 'pool8', groupSize: 2, legs: 3, sets: 1, groups: [[0, 1], [2, 3]] }, players: four });
+  pushEvent(m, MISS);
+  let R = pushEvent(m, pot(2)); // c (side 1) pots a solid after the break
+  assert.deepEqual(R.leg.st.groups, ['stripes', 'solids']);
+  R = pushEvent(m, { k: 'frame', p: 1 });
+  assert.deepEqual(R.groupWins, [0, 1]);
+  assert.equal(R.leg.breakSide, 1);
+  assert.equal(R.leg.cur, 3, 'd breaks: group pointers moved on');
+});
