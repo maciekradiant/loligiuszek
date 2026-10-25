@@ -1,4 +1,4 @@
-import { S, onRender, render, go, closeSheet } from './state.js';
+import { S, onRender, render, go, closeSheet, persist } from './state.js';
 import { morph } from './dom.js';
 import { unlock } from './audio.js';
 import { drawBoard, drawRack, confetti } from './fx.js';
@@ -39,6 +39,16 @@ const actions = {
     closeSheet();
   },
   'confirm-yes': () => resolveConfirm(true),
+  'recover-home': () => {
+    S.ui.overlay = null;
+    S.ui.flash = null;
+    go('home');
+  },
+  'recover-reset': () => {
+    S.session = null;
+    persist('session');
+    go('home');
+  },
   'confirm-no': () => resolveConfirm(false),
 };
 
@@ -91,9 +101,35 @@ function ambientView() {
   return `<div class="ambient" data-cat="${cat}" aria-hidden="true"></div>`;
 }
 
+// If a screen fails to draw (e.g. a saved game the code cannot read), show a way out instead of a blank page.
+function crashView(err) {
+  console.error(err);
+  return `<div class="screen"><div class="idle"><div>
+    <div class="eyebrow">Coś poszło nie tak</div>
+    <div class="display">Ups</div>
+    <p>Nie udało się wyświetlić tego ekranu. Wróć do menu, a jeśli to nie pomoże, zakończ trwającą grę. Gracze i historia zostaną.</p>
+    <div class="stack">
+      <button class="btn btn-primary" data-act="recover-home">Wróć do menu</button>
+      <button class="btn btn-line btn-danger" data-act="recover-reset">Zakończ trwającą grę</button>
+    </div>
+    <p class="hint" style="margin-top:14px">${esc(String(err?.message || err))}</p>
+  </div></div></div>`;
+}
+
 function renderApp() {
-  morph(app, ambientView() + screenView() + sheetView() + toastView());
-  afterRender();
+  let html;
+  try {
+    html = ambientView() + screenView() + sheetView() + toastView();
+  } catch (err) {
+    S.ui.sheet = null;
+    html = crashView(err);
+  }
+  morph(app, html);
+  try {
+    afterRender();
+  } catch (err) {
+    console.error(err);
+  }
 }
 
 let boardFontsReady = false;

@@ -1,7 +1,7 @@
 // Offline support: the app shell is cached on install and served cache-first, then refreshed in
 // the background so the next launch picks up updates. Bump VERSION when shipping changes.
 
-const VERSION = 'lotka-1.1.0';
+const VERSION = 'lotka-1.1.1';
 const SHELL = [
   './',
   'index.html',
